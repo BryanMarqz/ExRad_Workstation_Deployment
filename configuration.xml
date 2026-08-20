@@ -1,0 +1,18 @@
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="en-us" />
+      <ExcludeApp ID="Excel" />
+      <ExcludeApp ID="PowerPoint" />
+      <ExcludeApp ID="Outlook" />
+      <ExcludeApp ID="Publisher" />
+      <ExcludeApp ID="Access" />
+      <ExcludeApp ID="OneNote" />
+      <ExcludeApp ID="Teams" />
+      <ExcludeApp ID="OneDrive" />
+      <ExcludeApp ID="Lync" />
+    </Product>
+  </Add>
+  <Display Level="None" AcceptEULA="TRUE" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+</Configuration>
