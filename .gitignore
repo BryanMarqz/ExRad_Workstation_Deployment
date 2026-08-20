@@ -14,6 +14,7 @@ Tartarus_Keybindings/*.exe
 # Local backups and alternate drafts
 *.bak
 setup.ps1.txt
+ninjaone-url.txt
 
 # OS/editor metadata
 .DS_Store

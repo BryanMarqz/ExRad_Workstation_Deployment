@@ -32,11 +32,21 @@ Installer binaries are ignored by Git and remain local to the deployment folder.
 
 ## Run
 
-1. Add the required installers to the repository folder.
-2. Review `configuration.xml` and the bookmarks in `setup.ps1`.
-3. Double-click `run.bat` and approve the Administrator prompt.
-4. Select the applications and optional Tartarus copy operation.
-5. Click **Start Installation**.
+1. Create a local `ninjaone-url.txt` beside the scripts and paste the generated
+   NinjaOne Auto-installer URL into it. This ignored file must never be committed.
+2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
+   local NinjaOne package, then verifies signatures or the published hash.
+3. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
+4. Review `configuration.xml` and the bookmarks in `setup.ps1`.
+5. Double-click `run.bat` and approve the Administrator prompt.
+6. Select the applications and optional Tartarus copy operation.
+7. Click **Start Installation**.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1
+```
+
+Use `-Force` to replace installers that have already been downloaded.
 
 RamSoft is attempted silently first and falls back to its interactive installer
 when necessary. Razer Synapse uses its interactive installer.
