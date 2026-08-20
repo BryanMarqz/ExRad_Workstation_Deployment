@@ -1,0 +1,22 @@
+# Installer binaries and bundles
+*.exe
+*.msi
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+
+# Archives and generated files
+*.zip
+*.log
+Tartarus_Keybindings/*.exe
+
+# Local backups and alternate drafts
+*.bak
+setup.ps1.txt
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
