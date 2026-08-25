@@ -37,15 +37,37 @@ $NinjaFile = Get-FirstFileName -Filter 'NinjaOne-Agent*-Auto-*.msi' -Fallback 'N
 $SlackFile = Get-FirstFileName -Filter 'Slack*.msix*' -Fallback 'Slack.msix'
 
 $Apps = @(
-    @{ Name = 'Google Chrome'; CheckPath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"; Type = 'MSI'; File = 'googlechromestandaloneenterprise64.msi'; Args = '/qn /norestart' },
-    @{ Name = 'Microsoft Word (M365)'; CheckPath = "$env:ProgramFiles\Microsoft Office\root\Office16\WINWORD.EXE"; Type = 'EXE'; File = 'OfficeSetup.exe'; Args = "/configure `"$ScriptDir\configuration.xml`"" },
-    @{ Name = 'Slack'; CheckPath = "$env:ProgramFiles\WindowsApps\*Slack*"; Type = 'MSIX'; File = $SlackFile; Args = '' },
-    @{ Name = 'NinjaOne Agent'; CheckPath = "${env:ProgramFiles(x86)}\NinjaOne\NinjaRMMAgent.exe"; Type = 'MSI'; File = $NinjaFile; Args = '/qn /norestart' },
-    @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true },
-    @{ Name = 'AutoHotkey v2'; CheckPath = "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate' },
-    @{ Name = 'GCPW (Google Credential)'; CheckPath = "$env:ProgramFiles\Google\Credential Provider"; Type = 'EXE'; File = 'gcpwstandaloneenterprise64.exe'; Args = '/silent' },
-    @{ Name = 'Razer Synapse (Interactive)'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = '' }
+    @{ Name = 'Google Chrome'; CheckPath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"; Type = 'MSI'; File = 'googlechromestandaloneenterprise64.msi'; Args = '/qn /norestart'; DownloadAvailable = $true },
+    @{ Name = 'Microsoft Word (M365)'; CheckPath = "$env:ProgramFiles\Microsoft Office\root\Office16\WINWORD.EXE"; Type = 'EXE'; File = 'OfficeSetup.exe'; Args = "/configure `"$ScriptDir\configuration.xml`""; DownloadAvailable = $true },
+    @{ Name = 'Slack'; CheckPath = "$env:ProgramFiles\WindowsApps\*Slack*"; Type = 'MSIX'; File = $SlackFile; Args = ''; DownloadAvailable = $true },
+    @{ Name = 'NinjaOne Agent'; CheckPath = "${env:ProgramFiles(x86)}\NinjaOne\NinjaRMMAgent.exe"; Type = 'MSI'; File = $NinjaFile; Args = '/qn /norestart'; DownloadAvailable = $true },
+    @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true; ManualInstall = $true },
+    @{ Name = 'AutoHotkey v2'; CheckPath = "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate'; DownloadAvailable = $true },
+    @{ Name = 'GCPW (Google Credential)'; CheckPath = "$env:ProgramFiles\Google\Credential Provider"; Type = 'EXE'; File = 'gcpwstandaloneenterprise64.exe'; Args = '/silent'; DownloadAvailable = $true },
+    @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true }
 )
+
+function Get-PreflightStatus {
+    param([Parameter(Mandatory = $true)][hashtable]$App)
+
+    if (Test-Path -Path $App.CheckPath) {
+        return @{ Text = 'Installed'; Color = [System.Drawing.Color]::Green; Installed = $true }
+    }
+
+    $installerPath = Join-Path $ScriptDir $App.File
+    if (Test-Path -LiteralPath $installerPath) {
+        if ($App.ManualInstall) {
+            return @{ Text = 'Manual installation required'; Color = [System.Drawing.Color]::DarkOrange; Installed = $false }
+        }
+        return @{ Text = 'Installer ready'; Color = [System.Drawing.Color]::DarkGreen; Installed = $false }
+    }
+
+    if ($App.DownloadAvailable) {
+        return @{ Text = 'Download required'; Color = [System.Drawing.Color]::DarkGoldenrod; Installed = $false }
+    }
+
+    return @{ Text = 'Installer missing'; Color = [System.Drawing.Color]::Red; Installed = $false }
+}
 
 function Start-InstallerProcess {
     param(
@@ -140,38 +162,47 @@ function Copy-TartarusKeybindings {
 }
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'Automated Workstation Deployment'
-$form.Size = New-Object System.Drawing.Size(520, 520)
+$form.Text = 'Automated Workstation Deployment - Preflight'
+$form.Size = New-Object System.Drawing.Size(720, 560)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
 
 $titleLabel = New-Object System.Windows.Forms.Label
-$titleLabel.Text = 'Select Software to Install'
+$titleLabel.Text = 'Deployment Preflight'
 $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
-$titleLabel.Size = New-Object System.Drawing.Size(450, 25)
+$titleLabel.Size = New-Object System.Drawing.Size(650, 25)
 $titleLabel.Location = New-Object System.Drawing.Point(20, 15)
 $form.Controls.Add($titleLabel)
 
 $selectAllCB = New-Object System.Windows.Forms.CheckBox
 $selectAllCB.Text = 'Select All / Deselect All'
 $selectAllCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5, [System.Drawing.FontStyle]::Bold)
-$selectAllCB.Size = New-Object System.Drawing.Size(430, 25)
+$selectAllCB.Size = New-Object System.Drawing.Size(300, 25)
 $selectAllCB.Location = New-Object System.Drawing.Point(25, 45)
 $selectAllCB.Checked = $true
 $form.Controls.Add($selectAllCB)
 
+$statusHeader = New-Object System.Windows.Forms.Label
+$statusHeader.Text = 'Preflight status'
+$statusHeader.Font = New-Object System.Drawing.Font('Segoe UI', 9.5, [System.Drawing.FontStyle]::Bold)
+$statusHeader.Size = New-Object System.Drawing.Size(300, 25)
+$statusHeader.Location = New-Object System.Drawing.Point(360, 45)
+$form.Controls.Add($statusHeader)
+
 $checkBoxes = @{}
+$preflightLabels = @{}
 $installedApps = @{}
 $yPos = 75
 
 foreach ($app in $Apps) {
     $cb = New-Object System.Windows.Forms.CheckBox
-    $isInstalled = Test-Path -Path $app.CheckPath
+    $preflight = Get-PreflightStatus -App $app
+    $isInstalled = $preflight.Installed
     $installedApps[$app.Name] = $isInstalled
 
     if ($isInstalled) {
-        $cb.Text = "$($app.Name) (Already Installed)"
+        $cb.Text = $app.Name
         $cb.ForeColor = [System.Drawing.Color]::Gray
         $cb.Checked = $false
     }
@@ -181,10 +212,19 @@ foreach ($app in $Apps) {
     }
 
     $cb.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-    $cb.Size = New-Object System.Drawing.Size(450, 25)
+    $cb.Size = New-Object System.Drawing.Size(320, 25)
     $cb.Location = New-Object System.Drawing.Point(25, $yPos)
     $form.Controls.Add($cb)
     $checkBoxes[$app.Name] = $cb
+
+    $preflightLabel = New-Object System.Windows.Forms.Label
+    $preflightLabel.Text = $preflight.Text
+    $preflightLabel.ForeColor = $preflight.Color
+    $preflightLabel.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+    $preflightLabel.Size = New-Object System.Drawing.Size(315, 25)
+    $preflightLabel.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
+    $form.Controls.Add($preflightLabel)
+    $preflightLabels[$app.Name] = $preflightLabel
     $yPos += 28
 }
 
@@ -200,7 +240,7 @@ else {
     $copyTartarusCB.Checked = $true
 }
 $copyTartarusCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-$copyTartarusCB.Size = New-Object System.Drawing.Size(450, 25)
+$copyTartarusCB.Size = New-Object System.Drawing.Size(650, 25)
 $copyTartarusCB.Location = New-Object System.Drawing.Point(25, $yPos)
 $form.Controls.Add($copyTartarusCB)
 $yPos += 28
@@ -215,7 +255,7 @@ $selectAllCB.Add_CheckedChanged({
 $statusText = New-Object System.Windows.Forms.Label
 $statusText.Text = 'Ready to deploy.'
 $statusText.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Italic)
-$statusText.Size = New-Object System.Drawing.Size(460, 45)
+$statusText.Size = New-Object System.Drawing.Size(650, 45)
 $statusText.Location = New-Object System.Drawing.Point(25, ($yPos + 10))
 $form.Controls.Add($statusText)
 
@@ -223,7 +263,7 @@ $btnStart = New-Object System.Windows.Forms.Button
 $btnStart.Text = 'Start Installation'
 $btnStart.Font = New-Object System.Drawing.Font('Segoe UI', 9.5, [System.Drawing.FontStyle]::Bold)
 $btnStart.Size = New-Object System.Drawing.Size(150, 32)
-$btnStart.Location = New-Object System.Drawing.Point(320, ($yPos + 55))
+$btnStart.Location = New-Object System.Drawing.Point(525, ($yPos + 55))
 $form.Controls.Add($btnStart)
 
 $btnStart.Add_Click({
@@ -238,25 +278,25 @@ $btnStart.Add_Click({
 
         $filePath = Join-Path $ScriptDir $app.File
         if (-not (Test-Path -LiteralPath $filePath)) {
-            $cb.Text = "$($app.Name) - File missing"
-            $cb.ForeColor = [System.Drawing.Color]::Red
+            $preflightLabels[$app.Name].Text = 'Installer missing'
+            $preflightLabels[$app.Name].ForeColor = [System.Drawing.Color]::Red
             $failures.Add("$($app.Name): installer file not found")
             continue
         }
 
-        $cb.Text = "$($app.Name) - Installing..."
-        $cb.ForeColor = [System.Drawing.Color]::DarkBlue
+        $preflightLabels[$app.Name].Text = 'Installing...'
+        $preflightLabels[$app.Name].ForeColor = [System.Drawing.Color]::DarkBlue
         $statusText.Text = "Installing $($app.Name)..."
         [System.Windows.Forms.Application]::DoEvents()
 
         try {
             Invoke-Installer -App $app -FilePath $filePath
-            $cb.Text = "$($app.Name) - [$DoneMark Done]"
-            $cb.ForeColor = [System.Drawing.Color]::Green
+            $preflightLabels[$app.Name].Text = "[$DoneMark Done] Installed"
+            $preflightLabels[$app.Name].ForeColor = [System.Drawing.Color]::Green
         }
         catch {
-            $cb.Text = "$($app.Name) - Failed"
-            $cb.ForeColor = [System.Drawing.Color]::Red
+            $preflightLabels[$app.Name].Text = 'Failed'
+            $preflightLabels[$app.Name].ForeColor = [System.Drawing.Color]::Red
             $failures.Add("$($app.Name): $($_.Exception.Message)")
         }
         [System.Windows.Forms.Application]::DoEvents()

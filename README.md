@@ -4,6 +4,10 @@ PowerShell-based Windows workstation deployment utility with a graphical app
 selector. It installs locally supplied software packages, copies optional Razer
 Tartarus keybindings, and configures managed Chrome bookmarks.
 
+The preflight view shows the current state of every application before the
+deployment starts: **Installed**, **Installer ready**, **Installer missing**,
+**Download required**, or **Manual installation required**.
+
 ## Security
 
 This public repository intentionally contains **no installer binaries** and no
