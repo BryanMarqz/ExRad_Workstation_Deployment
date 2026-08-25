@@ -34,18 +34,18 @@ Installer binaries are ignored by Git and remain local to the deployment folder.
 
 1. Create a local `ninjaone-url.txt` beside the scripts and paste the generated
    NinjaOne Auto-installer URL into it. This ignored file must never be committed.
-2. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
-3. Review `configuration.xml` and the bookmarks in `setup.ps1`.
-4. Double-click `run.bat` and approve the Administrator prompt. The launcher
-   downloads and verifies any missing installers before opening the app selector.
-5. Select the applications and optional Tartarus copy operation.
-6. Click **Start Installation**.
+2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
+   local NinjaOne package, then verifies signatures or the published hash.
+3. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
+4. Review `configuration.xml` and the bookmarks in `setup.ps1`.
+5. Double-click `run.bat` and approve the Administrator prompt.
+6. Select the applications and optional Tartarus copy operation.
+7. Click **Start Installation**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1
 ```
 
-The command above is optional and can be used to run the download step by itself.
 Use `-Force` to replace installers that have already been downloaded.
 
 RamSoft is attempted silently first and falls back to its interactive installer
