@@ -1,8 +1,0 @@
-; Button Coordinates for AutoHotkey Scripts
-; Captured: 2026-05-26
-; Setup: 6-monitor configuration
-
-Folder Forward   X: 1024   Y: 157
-Folder Accept    X: 1093   Y: 147
-Folder Reject    X: 1150   Y: 154
-Play             X: 4372   Y: 136

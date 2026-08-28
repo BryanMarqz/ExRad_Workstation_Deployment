@@ -101,6 +101,45 @@ function Test-AppHardwarePresent {
     return $true
 }
 
+function Test-AutoHotkeyV2Installed {
+    $candidatePaths = @(
+        "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe",
+        "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey32.exe",
+        "$env:ProgramFiles\AutoHotkey\UX\AutoHotkeyUX.exe",
+        "${env:ProgramFiles(x86)}\AutoHotkey\v2\AutoHotkey32.exe",
+        "${env:ProgramFiles(x86)}\AutoHotkey\UX\AutoHotkeyUX.exe",
+        "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey64.exe",
+        "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey32.exe",
+        "$env:LOCALAPPDATA\Programs\AutoHotkey\UX\AutoHotkeyUX.exe"
+    )
+    if ($candidatePaths | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1) {
+        return $true
+    }
+
+    $uninstallRoots = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    $registered = Get-ItemProperty -Path $uninstallRoots -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.DisplayName -match '^AutoHotkey' -and
+            ($_.DisplayVersion -match '^2(?:\.|$)' -or $_.DisplayName -match '(?:^|\s)v?2(?:\.|\s|$)')
+        } |
+        Select-Object -First 1
+    if ($null -ne $registered) { return $true }
+
+    foreach ($commandName in @('AutoHotkey.exe', 'AutoHotkey64.exe', 'AutoHotkey32.exe')) {
+        $commands = @(Get-Command $commandName -CommandType Application -All -ErrorAction SilentlyContinue)
+        foreach ($command in $commands) {
+            $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($command.Source).ProductVersion
+            if ($version -match '^2(?:\.|$)') { return $true }
+        }
+    }
+
+    return $false
+}
+
 function Test-GcpwEnrollmentTokenConfigured {
     try {
         $configuredToken = (Get-ItemProperty -LiteralPath $GcpwCloudManagementPath `
@@ -179,7 +218,7 @@ $Apps = @(
     @{ Name = 'Slack'; CheckPath = "$env:ProgramFiles\WindowsApps\*Slack*"; Type = 'MSIX'; File = $SlackFile; Args = ''; DownloadAvailable = $true },
     @{ Name = 'NinjaOne Agent'; CheckPath = "${env:ProgramFiles(x86)}\NinjaOne\NinjaRMMAgent.exe"; Type = 'MSI'; File = $NinjaFile; Args = '/qn /norestart'; DownloadAvailable = $true },
     @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true; ManualInstall = $true },
-    @{ Name = 'AutoHotkey v2'; CheckPath = "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate'; DownloadAvailable = $true },
+    @{ Name = 'AutoHotkey v2'; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate'; DownloadAvailable = $true; InstalledTest = { Test-AutoHotkeyV2Installed } },
     @{ Name = 'GCPW (Google Credential)'; CheckPath = "$env:ProgramFiles\Google\Credential Provider"; Type = 'EXE'; File = 'gcpwstandaloneenterprise64.exe'; Args = '/silent'; DownloadAvailable = $true },
     @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true },
     @{
@@ -302,8 +341,6 @@ function Invoke-Installer {
 function Copy-TartarusKeybindings {
     $destination = $TartarusDestination
 
-    if (Test-Path -LiteralPath $destination) { return }
-
     if (Test-Path -LiteralPath $SourceFolder) {
         New-Item -ItemType Directory -Path $destination -Force | Out-Null
         Copy-Item -Path (Join-Path $SourceFolder '*') -Destination $destination -Recurse -Force
@@ -411,7 +448,7 @@ foreach ($app in $Apps) {
 $copyTartarusCB = New-Object System.Windows.Forms.CheckBox
 $tartarusAlreadyExists = Test-Path -LiteralPath $TartarusDestination
 if ($tartarusAlreadyExists) {
-    $copyTartarusCB.Text = 'Copy Tartarus Keybindings to Documents (Already Exists)'
+    $copyTartarusCB.Text = 'Update Tartarus Keybindings in Documents (Folder Exists)'
     $copyTartarusCB.ForeColor = [System.Drawing.Color]::Gray
     $copyTartarusCB.Checked = $false
 }

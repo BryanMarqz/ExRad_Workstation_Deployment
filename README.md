@@ -36,6 +36,13 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 
 Installer binaries are ignored by Git and remain local to the deployment folder.
 
+`Tartarus_Keybindings` contains the deployment profile and its AutoHotkey v2
+actions:
+
+- `Default-Profile.synapse4`
+- `Play.ahk`
+- `Record.ahk`
+
 Optionally place `set_gcpw_token.reg` beside `setup.ps1`. The preflight screen
 will offer **Apply GCPW enrollment token**. The script reads only the
 `EnrollmentToken` value for the approved Google CloudManagement policy key,
@@ -70,6 +77,8 @@ when necessary. Razer Synapse uses its interactive installer.
 - Designed for Windows PowerShell 5.1 and Windows 10/11.
 - Microsoft 365 configuration installs Word while excluding the other listed apps.
 - Tartarus files are copied to `Documents\Tartarus Keybindings` only when selected.
+- AutoHotkey v2 detection checks system-wide and per-user installation paths,
+  uninstall registry records, and executables available on `PATH`.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
   package for the exact GPU, computer manufacturer, and Windows version.
