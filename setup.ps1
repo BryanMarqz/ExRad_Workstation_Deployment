@@ -32,9 +32,62 @@ function Get-FirstFileName {
     return $match.Name
 }
 
+function Get-DisplayDriverRecords {
+    try {
+        return @(Get-CimInstance -ClassName Win32_PnPSignedDriver `
+            -Filter "DeviceClass='DISPLAY'" -ErrorAction Stop)
+    }
+    catch {
+        return @()
+    }
+}
+
+function Test-DisplayHardwarePresent {
+    param([Parameter(Mandatory = $true)][string]$VendorId)
+
+    return $null -ne (Get-DisplayDriverRecords |
+        Where-Object { $_.DeviceID -match $VendorId } |
+        Select-Object -First 1)
+}
+
+function Test-DisplayDriverInstalled {
+    param(
+        [Parameter(Mandatory = $true)][string]$VendorId,
+        [Parameter(Mandatory = $true)][string]$ProviderPattern
+    )
+
+    return $null -ne (Get-DisplayDriverRecords |
+        Where-Object {
+            $_.DeviceID -match $VendorId -and
+            $_.DriverProviderName -match $ProviderPattern -and
+            -not [string]::IsNullOrWhiteSpace($_.DriverVersion)
+        } |
+        Select-Object -First 1)
+}
+
+function Test-AppInstalled {
+    param([Parameter(Mandatory = $true)][hashtable]$App)
+
+    if ($App.InstalledTest) {
+        return [bool](& $App.InstalledTest)
+    }
+    return Test-Path -Path $App.CheckPath
+}
+
+function Test-AppHardwarePresent {
+    param([Parameter(Mandatory = $true)][hashtable]$App)
+
+    if ($App.HardwareTest) {
+        return [bool](& $App.HardwareTest)
+    }
+    return $true
+}
+
 # Generated NinjaOne installers contain an enrollment token. Keep them local.
 $NinjaFile = Get-FirstFileName -Filter 'NinjaOne-Agent*-Auto-*.msi' -Fallback 'NinjaOne-Agent-Auto-x86-64.msi'
 $SlackFile = Get-FirstFileName -Filter 'Slack*.msix*' -Fallback 'Slack.msix'
+$NvidiaDriverFile = Get-FirstFileName -Filter 'NVIDIA-Driver*.exe' -Fallback 'NVIDIA-Driver.exe'
+$AmdDriverFile = Get-FirstFileName -Filter 'AMD-Driver*.exe' -Fallback 'AMD-Driver.exe'
 
 $Apps = @(
     @{ Name = 'Google Chrome'; CheckPath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"; Type = 'MSI'; File = 'googlechromestandaloneenterprise64.msi'; Args = '/qn /norestart'; DownloadAvailable = $true },
@@ -44,13 +97,37 @@ $Apps = @(
     @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true; ManualInstall = $true },
     @{ Name = 'AutoHotkey v2'; CheckPath = "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe"; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate'; DownloadAvailable = $true },
     @{ Name = 'GCPW (Google Credential)'; CheckPath = "$env:ProgramFiles\Google\Credential Provider"; Type = 'EXE'; File = 'gcpwstandaloneenterprise64.exe'; Args = '/silent'; DownloadAvailable = $true },
-    @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true }
+    @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true },
+    @{
+        Name = 'NVIDIA Graphics Driver'
+        Type = 'EXE'
+        File = $NvidiaDriverFile
+        Args = '-s -n Display.Driver'
+        InstalledTest = { Test-DisplayDriverInstalled -VendorId 'VEN_10DE' -ProviderPattern 'NVIDIA' }
+        HardwareTest = { Test-DisplayHardwarePresent -VendorId 'VEN_10DE' }
+        SuccessExitCodes = @(0, 1, 1641, 3010)
+    },
+    @{
+        Name = 'AMD Graphics Driver (Optional)'
+        Type = 'EXE'
+        File = $AmdDriverFile
+        Args = '-install'
+        InstalledTest = { Test-DisplayDriverInstalled -VendorId 'VEN_1002' -ProviderPattern 'AMD|Advanced Micro Devices' }
+        HardwareTest = { Test-DisplayHardwarePresent -VendorId 'VEN_1002' }
+        DefaultSelected = $false
+        IncludeInSelectAll = $false
+        SuccessExitCodes = @(0, 1641, 3010)
+    }
 )
 
 function Get-PreflightStatus {
     param([Parameter(Mandatory = $true)][hashtable]$App)
 
-    if (Test-Path -Path $App.CheckPath) {
+    if (-not (Test-AppHardwarePresent -App $App)) {
+        return @{ Text = 'GPU not detected'; Color = [System.Drawing.Color]::Gray; Installed = $false; Selectable = $false }
+    }
+
+    if (Test-AppInstalled -App $App) {
         return @{ Text = 'Installed'; Color = [System.Drawing.Color]::Green; Installed = $true }
     }
 
@@ -102,8 +179,14 @@ function Invoke-Installer {
         }
         'EXE' {
             $process = Start-InstallerProcess -FilePath $FilePath -Arguments $App.Args
-            $successfulExit = $process.ExitCode -in @(0, 1641, 3010)
-            $installed = Test-Path -Path $App.CheckPath
+            $successExitCodes = if ($App.SuccessExitCodes) {
+                @($App.SuccessExitCodes)
+            }
+            else {
+                @(0, 1641, 3010)
+            }
+            $successfulExit = $process.ExitCode -in $successExitCodes
+            $installed = Test-AppInstalled -App $App
 
             if ($App.InteractiveFallback -and (-not $successfulExit -or -not $installed)) {
                 [System.Windows.Forms.MessageBox]::Show(
@@ -114,7 +197,7 @@ function Invoke-Installer {
                 ) | Out-Null
                 $process = Start-InstallerProcess -FilePath $FilePath
                 $successfulExit = $process.ExitCode -in @(0, 1641, 3010)
-                $installed = Test-Path -Path $App.CheckPath
+                $installed = Test-AppInstalled -App $App
             }
 
             if (-not $successfulExit) {
@@ -193,22 +276,33 @@ $form.Controls.Add($statusHeader)
 $checkBoxes = @{}
 $preflightLabels = @{}
 $installedApps = @{}
+$selectAllEligibleApps = @{}
 $yPos = 75
 
 foreach ($app in $Apps) {
     $cb = New-Object System.Windows.Forms.CheckBox
     $preflight = Get-PreflightStatus -App $app
     $isInstalled = $preflight.Installed
+    $isSelectable = $preflight.Selectable -ne $false
+    $defaultSelected = if ($null -ne $app.DefaultSelected) { [bool]$app.DefaultSelected } else { $true }
+    $includeInSelectAll = if ($null -ne $app.IncludeInSelectAll) { [bool]$app.IncludeInSelectAll } else { $true }
     $installedApps[$app.Name] = $isInstalled
+    $selectAllEligibleApps[$app.Name] = $isSelectable -and -not $isInstalled -and $includeInSelectAll
 
     if ($isInstalled) {
         $cb.Text = $app.Name
         $cb.ForeColor = [System.Drawing.Color]::Gray
         $cb.Checked = $false
     }
+    elseif (-not $isSelectable) {
+        $cb.Text = $app.Name
+        $cb.ForeColor = [System.Drawing.Color]::Gray
+        $cb.Checked = $false
+        $cb.Enabled = $false
+    }
     else {
         $cb.Text = $app.Name
-        $cb.Checked = $true
+        $cb.Checked = $defaultSelected
     }
 
     $cb.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
@@ -247,7 +341,7 @@ $yPos += 28
 
 $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
-        $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and -not $installedApps[$app.Name]
+        $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
     }
     $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyExists
 })
