@@ -31,8 +31,8 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 | AutoHotkey v2 | `AutoHotkey_2.0.26_setup.exe` |
 | Google Credential Provider for Windows | `gcpwstandaloneenterprise64.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
-| NVIDIA graphics driver | `NVIDIA-Driver.exe` or `NVIDIA-Driver*.exe` |
-| AMD graphics driver (optional) | `AMD-Driver.exe` or `AMD-Driver*.exe` |
+| NVIDIA graphics driver | `NVIDIA-Driver*.exe` or `*-desktop-win10-win11-64bit-*-dch-whql.exe` |
+| AMD graphics driver (optional) | `AMD-Driver*.exe` or `*amd-software-adrenalin-edition-*.exe` |
 
 Installer binaries are ignored by Git and remain local to the deployment folder.
 
@@ -69,3 +69,6 @@ when necessary. Razer Synapse uses its interactive installer.
   NVIDIA hardware is detected without its vendor driver.
 - AMD is optional and excluded from **Select All**. The script does not disable
   the AMD iGPU; it only leaves its driver installation unchecked by default.
+- AMD `minimalsetup_web` packages require internet access and technician input.
+  Full offline AMD packages use unattended mode and fall back to the interactive
+  installer if the AMD driver cannot be confirmed.

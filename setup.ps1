@@ -32,6 +32,22 @@ function Get-FirstFileName {
     return $match.Name
 }
 
+function Get-FirstFileNameFromFilters {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Filters,
+        [Parameter(Mandatory = $true)][string]$Fallback
+    )
+
+    foreach ($filter in $Filters) {
+        $match = Get-ChildItem -LiteralPath $ScriptDir -Filter $filter -File |
+            Sort-Object Name |
+            Select-Object -First 1
+        if ($null -ne $match) { return $match.Name }
+    }
+
+    return $Fallback
+}
+
 function Get-DisplayDriverRecords {
     try {
         return @(Get-CimInstance -ClassName Win32_PnPSignedDriver `
@@ -86,8 +102,14 @@ function Test-AppHardwarePresent {
 # Generated NinjaOne installers contain an enrollment token. Keep them local.
 $NinjaFile = Get-FirstFileName -Filter 'NinjaOne-Agent*-Auto-*.msi' -Fallback 'NinjaOne-Agent-Auto-x86-64.msi'
 $SlackFile = Get-FirstFileName -Filter 'Slack*.msix*' -Fallback 'Slack.msix'
-$NvidiaDriverFile = Get-FirstFileName -Filter 'NVIDIA-Driver*.exe' -Fallback 'NVIDIA-Driver.exe'
-$AmdDriverFile = Get-FirstFileName -Filter 'AMD-Driver*.exe' -Fallback 'AMD-Driver.exe'
+$NvidiaDriverFile = Get-FirstFileNameFromFilters `
+    -Filters @('NVIDIA-Driver*.exe', '*-desktop-win10-win11-64bit-*-dch-whql.exe') `
+    -Fallback 'NVIDIA-Driver.exe'
+$AmdDriverFile = Get-FirstFileNameFromFilters `
+    -Filters @('AMD-Driver*.exe', '*amd-software-adrenalin-edition-*.exe') `
+    -Fallback 'AMD-Driver.exe'
+$AmdDriverIsWebBootstrapper = $AmdDriverFile -match '(?i)minimalsetup.*_web\.exe$'
+$AmdDriverArgs = if ($AmdDriverIsWebBootstrapper) { '' } else { '-install' }
 
 $Apps = @(
     @{ Name = 'Google Chrome'; CheckPath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"; Type = 'MSI'; File = 'googlechromestandaloneenterprise64.msi'; Args = '/qn /norestart'; DownloadAvailable = $true },
@@ -111,11 +133,13 @@ $Apps = @(
         Name = 'AMD Graphics Driver (Optional)'
         Type = 'EXE'
         File = $AmdDriverFile
-        Args = '-install'
+        Args = $AmdDriverArgs
         InstalledTest = { Test-DisplayDriverInstalled -VendorId 'VEN_1002' -ProviderPattern 'AMD|Advanced Micro Devices' }
         HardwareTest = { Test-DisplayHardwarePresent -VendorId 'VEN_1002' }
         DefaultSelected = $false
         IncludeInSelectAll = $false
+        InteractiveFallback = -not $AmdDriverIsWebBootstrapper
+        ManualInstall = $AmdDriverIsWebBootstrapper
         SuccessExitCodes = @(0, 1641, 3010)
     }
 )
@@ -204,7 +228,7 @@ function Invoke-Installer {
                 throw "Installer exited with code $($process.ExitCode)."
             }
             if ($App.InteractiveFallback -and -not $installed) {
-                throw 'The installer closed, but the RamSoft application was not found.'
+                throw "The installer closed, but $($App.Name) could not be confirmed."
             }
         }
         default {
