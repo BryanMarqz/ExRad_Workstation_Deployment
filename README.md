@@ -4,6 +4,10 @@ PowerShell-based Windows workstation deployment utility with a graphical app
 selector. It installs locally supplied software packages, copies optional Razer
 Tartarus keybindings, and configures managed Chrome bookmarks.
 
+The preflight view shows the current state of every application before the
+deployment starts: **Installed**, **Installer ready**, **Installer missing**,
+**Download required**, **Manual installation required**, or **GPU not detected**.
+
 ## Security
 
 This public repository intentionally contains **no installer binaries** and no
@@ -27,6 +31,8 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 | AutoHotkey v2 | `AutoHotkey_2.0.26_setup.exe` |
 | Google Credential Provider for Windows | `gcpwstandaloneenterprise64.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
+| NVIDIA graphics driver | `NVIDIA-Driver.exe` or `NVIDIA-Driver*.exe` |
+| AMD graphics driver (optional) | `AMD-Driver.exe` or `AMD-Driver*.exe` |
 
 Installer binaries are ignored by Git and remain local to the deployment folder.
 
@@ -57,3 +63,9 @@ when necessary. Razer Synapse uses its interactive installer.
 - Microsoft 365 configuration installs Word while excluding the other listed apps.
 - Tartarus files are copied to `Documents\Tartarus Keybindings` only when selected.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
+- Graphics-driver packages are not downloaded automatically. Supply the correct
+  package for the exact GPU, computer manufacturer, and Windows version.
+- NVIDIA uses display-driver-only silent installation and is selected only when
+  NVIDIA hardware is detected without its vendor driver.
+- AMD is optional and excluded from **Select All**. The script does not disable
+  the AMD iGPU; it only leaves its driver installation unchecked by default.
