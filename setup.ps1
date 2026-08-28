@@ -16,6 +16,8 @@ $ScriptDir = $PSScriptRoot
 $SourceFolder = Join-Path $ScriptDir 'Tartarus_Keybindings'
 $SourceZip = Join-Path $ScriptDir 'Tartarus_Keybindings.zip'
 $TartarusDestination = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Tartarus Keybindings'
+$GcpwTokenFile = Join-Path $ScriptDir 'set_gcpw_token.reg'
+$GcpwCloudManagementPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
 $DoneMark = [char]0x2713
 
 function Get-FirstFileName {
@@ -97,6 +99,66 @@ function Test-AppHardwarePresent {
         return [bool](& $App.HardwareTest)
     }
     return $true
+}
+
+function Test-GcpwEnrollmentTokenConfigured {
+    try {
+        $configuredToken = (Get-ItemProperty -LiteralPath $GcpwCloudManagementPath `
+            -Name 'EnrollmentToken' -ErrorAction Stop).EnrollmentToken
+        return -not [string]::IsNullOrWhiteSpace($configuredToken)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-GcpwEnrollmentTokenFromFile {
+    if (-not (Test-Path -LiteralPath $GcpwTokenFile)) {
+        throw 'set_gcpw_token.reg was not found beside setup.ps1.'
+    }
+
+    $raw = Get-Content -LiteralPath $GcpwTokenFile -Raw -Encoding Unicode
+    if ($raw -notmatch 'Windows Registry Editor Version 5\.00') {
+        # Some editors save .reg files as UTF-8 rather than UTF-16 LE.
+        $raw = Get-Content -LiteralPath $GcpwTokenFile -Raw -Encoding UTF8
+    }
+
+    $sections = [regex]::Matches($raw, '(?m)^\s*\[[^\]]+\]\s*$')
+    if ($sections.Count -ne 1 -or
+        $sections[0].Value -notmatch '^\s*\[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Google\\CloudManagement\]\s*$') {
+        throw 'The registry file must contain only the approved GCPW CloudManagement key.'
+    }
+
+    $assignments = [regex]::Matches($raw, '(?m)^\s*(?:@|"[^"]+")\s*=.*$')
+    if ($assignments.Count -ne 1 -or $assignments[0].Value -notmatch '^\s*"EnrollmentToken"\s*=') {
+        throw 'The registry file must contain only one EnrollmentToken value.'
+    }
+
+    $tokenMatch = [regex]::Match(
+        $raw,
+        '(?m)^\s*"EnrollmentToken"\s*=\s*"(?<Token>[^"\r\n]+)"\s*$'
+    )
+    if (-not $tokenMatch.Success -or [string]::IsNullOrWhiteSpace($tokenMatch.Groups['Token'].Value)) {
+        throw 'A valid GCPW EnrollmentToken value was not found.'
+    }
+
+    return $tokenMatch.Groups['Token'].Value
+}
+
+function Set-GcpwEnrollmentToken {
+    $token = Get-GcpwEnrollmentTokenFromFile
+
+    if (-not (Test-Path -LiteralPath $GcpwCloudManagementPath)) {
+        New-Item -Path $GcpwCloudManagementPath -Force | Out-Null
+    }
+    New-ItemProperty -LiteralPath $GcpwCloudManagementPath -Name 'EnrollmentToken' `
+        -Value $token -PropertyType String -Force | Out-Null
+
+    $storedToken = (Get-ItemProperty -LiteralPath $GcpwCloudManagementPath `
+        -Name 'EnrollmentToken' -ErrorAction Stop).EnrollmentToken
+    if ($storedToken -ne $token) {
+        throw 'The GCPW enrollment token could not be verified after writing it.'
+    }
 }
 
 # Generated NinjaOne installers contain an enrollment token. Keep them local.
@@ -363,11 +425,47 @@ $copyTartarusCB.Location = New-Object System.Drawing.Point(25, $yPos)
 $form.Controls.Add($copyTartarusCB)
 $yPos += 28
 
+$applyGcpwTokenCB = New-Object System.Windows.Forms.CheckBox
+$applyGcpwTokenCB.Text = 'Apply GCPW enrollment token'
+$applyGcpwTokenCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$applyGcpwTokenCB.Size = New-Object System.Drawing.Size(320, 25)
+$applyGcpwTokenCB.Location = New-Object System.Drawing.Point(25, $yPos)
+
+$gcpwTokenStatus = New-Object System.Windows.Forms.Label
+$gcpwTokenStatus.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$gcpwTokenStatus.Size = New-Object System.Drawing.Size(315, 25)
+$gcpwTokenStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
+
+$gcpwTokenAlreadyConfigured = Test-GcpwEnrollmentTokenConfigured
+$gcpwTokenFileExists = Test-Path -LiteralPath $GcpwTokenFile
+if ($gcpwTokenAlreadyConfigured) {
+    $applyGcpwTokenCB.Checked = $false
+    $applyGcpwTokenCB.Enabled = $gcpwTokenFileExists
+    $gcpwTokenStatus.Text = 'Already configured'
+    $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::Green
+}
+elseif ($gcpwTokenFileExists) {
+    $applyGcpwTokenCB.Checked = $true
+    $gcpwTokenStatus.Text = 'Token file ready'
+    $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::DarkGreen
+}
+else {
+    $applyGcpwTokenCB.Checked = $false
+    $applyGcpwTokenCB.Enabled = $false
+    $gcpwTokenStatus.Text = 'Token file missing'
+    $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::Red
+}
+$form.Controls.Add($applyGcpwTokenCB)
+$form.Controls.Add($gcpwTokenStatus)
+$yPos += 28
+
 $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
         $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
     }
     $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyExists
+    $applyGcpwTokenCB.Checked = $selectAllCB.Checked -and `
+        $gcpwTokenFileExists -and -not $gcpwTokenAlreadyConfigured
 })
 
 $statusText = New-Object System.Windows.Forms.Label
@@ -388,7 +486,9 @@ $btnStart.Add_Click({
     $btnStart.Enabled = $false
     $selectAllCB.Enabled = $false
     $copyTartarusCB.Enabled = $false
+    $applyGcpwTokenCB.Enabled = $false
     $failures = New-Object System.Collections.Generic.List[string]
+    $restartRequired = $false
 
     foreach ($app in $Apps) {
         $cb = $checkBoxes[$app.Name]
@@ -436,6 +536,24 @@ $btnStart.Add_Click({
         }
     }
 
+    if ($applyGcpwTokenCB.Checked) {
+        try {
+            $gcpwTokenStatus.Text = 'Applying...'
+            $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::DarkBlue
+            $statusText.Text = 'Applying GCPW enrollment token...'
+            [System.Windows.Forms.Application]::DoEvents()
+            Set-GcpwEnrollmentToken
+            $gcpwTokenStatus.Text = "[$DoneMark Done] Restart required"
+            $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::Green
+            $restartRequired = $true
+        }
+        catch {
+            $gcpwTokenStatus.Text = 'Failed'
+            $gcpwTokenStatus.ForeColor = [System.Drawing.Color]::Red
+            $failures.Add("GCPW enrollment token: $($_.Exception.Message)")
+        }
+    }
+
     try {
         $statusText.Text = 'Applying Chrome policies...'
         [System.Windows.Forms.Application]::DoEvents()
@@ -458,9 +576,17 @@ $btnStart.Add_Click({
     }
 
     if ($failures.Count -eq 0) {
-        $statusText.Text = 'Deployment complete.'
+        $completionMessage = 'Installation completed successfully.'
+        if ($restartRequired) {
+            $statusText.Text = 'Deployment complete - restart required.'
+            $completionMessage += [Environment]::NewLine + [Environment]::NewLine +
+                'Restart Windows before the first GCPW sign-in.'
+        }
+        else {
+            $statusText.Text = 'Deployment complete.'
+        }
         [System.Windows.Forms.MessageBox]::Show(
-            'Installation completed successfully.', 'Done',
+            $completionMessage, 'Done',
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) | Out-Null
@@ -468,13 +594,19 @@ $btnStart.Add_Click({
     }
     else {
         $statusText.Text = "Deployment finished with $($failures.Count) error(s)."
+        $failureMessage = $failures -join [Environment]::NewLine
+        if ($restartRequired) {
+            $failureMessage += [Environment]::NewLine + [Environment]::NewLine +
+                'The GCPW token was applied. Restart Windows before the first GCPW sign-in.'
+        }
         [System.Windows.Forms.MessageBox]::Show(
-            ($failures -join [Environment]::NewLine), 'Deployment errors',
+            $failureMessage, 'Deployment errors',
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
         ) | Out-Null
         $btnStart.Enabled = $true
         $copyTartarusCB.Enabled = $true
+        $applyGcpwTokenCB.Enabled = $gcpwTokenFileExists -and -not $gcpwTokenAlreadyConfigured
     }
 })
 

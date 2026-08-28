@@ -11,8 +11,8 @@ deployment starts: **Installed**, **Installer ready**, **Installer missing**,
 ## Security
 
 This public repository intentionally contains **no installer binaries** and no
-enrollment tokens. In particular, do not commit a generated NinjaOne installer:
-the MSI contains an organization/location enrollment token.
+enrollment tokens. In particular, do not commit a generated NinjaOne installer
+or `set_gcpw_token.reg`: both contain organization enrollment information.
 
 Download all installers from their official vendor portals and verify their
 digital signatures before use.
@@ -36,17 +36,25 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 
 Installer binaries are ignored by Git and remain local to the deployment folder.
 
+Optionally place `set_gcpw_token.reg` beside `setup.ps1`. The preflight screen
+will offer **Apply GCPW enrollment token**. The script reads only the
+`EnrollmentToken` value for the approved Google CloudManagement policy key,
+writes that value after installation, and verifies it without displaying it.
+The file is ignored by Git and must remain private. Restart Windows after the
+token is applied and before the first GCPW sign-in.
+
 ## Run
 
 1. Create a local `ninjaone-url.txt` beside the scripts and paste the generated
    NinjaOne Auto-installer URL into it. This ignored file must never be committed.
 2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
    local NinjaOne package, then verifies signatures or the published hash.
-3. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
-4. Review `configuration.xml` and the bookmarks in `setup.ps1`.
-5. Double-click `run.bat` and approve the Administrator prompt.
-6. Select the applications and optional Tartarus copy operation.
-7. Click **Start Installation**.
+3. If GCPW enrollment is needed, add the private `set_gcpw_token.reg` file.
+4. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
+5. Review `configuration.xml` and the bookmarks in `setup.ps1`.
+6. Double-click `run.bat` and approve the Administrator prompt.
+7. Select the applications, GCPW token, and optional Tartarus copy operation.
+8. Click **Start Installation**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1

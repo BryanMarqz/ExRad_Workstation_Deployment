@@ -15,6 +15,7 @@ Tartarus_Keybindings/*.exe
 *.bak
 setup.ps1.txt
 ninjaone-url.txt
+set_gcpw_token.reg
 
 # OS/editor metadata
 .DS_Store
