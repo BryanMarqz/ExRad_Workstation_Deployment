@@ -136,13 +136,13 @@ when necessary. Razer Synapse uses its interactive installer.
 - Designed for Windows PowerShell 5.1 and Windows 10/11.
 - Microsoft 365 configuration installs Word while excluding the other listed apps.
 - When Tartarus profile preparation is selected, the script validates and
-  decodes every base64 profile payload. If it finds an AHK path containing a
-  different `C:\Users\<name>` value, it substitutes the current Windows
-  username, re-encodes the payload, and recalculates the profile MD5 field.
+  decodes every base64 profile payload. It redirects embedded AHK paths to
+  `Documents\Tartarus Keybindings`, re-encodes the payload, and recalculates
+  the profile MD5 field.
 - The prepared `.synapse4` file is kept in `Documents\Tartarus Keybindings` and
-  staged in the detected Synapse 3 or Synapse 4 profile directory. Any included
-  `.ahk` files are also copied to the current user's `Downloads` folder so
-  exported launch paths remain valid.
+  staged in the detected Synapse 3 or Synapse 4 profile directory. Included
+  `.ahk` files remain beside it in `Documents\Tartarus Keybindings`, which is
+  also the location used by the imported launch mappings.
 - This workflow intentionally leaves the final import confirmation to the
   technician. On first Synapse launch, choose **Use without account**, open the
   profile import screen, and select the path displayed by the deployment

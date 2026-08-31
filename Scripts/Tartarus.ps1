@@ -1,7 +1,7 @@
 function Convert-RazerProfileForUser {
     param(
         [Parameter(Mandatory = $true)][string]$ProfileFilePath,
-        [Parameter(Mandatory = $true)][string]$TargetUsername
+        [Parameter(Mandatory = $true)][string]$TargetAhkDirectory
     )
 
     $outerProfile = Get-Content -LiteralPath $ProfileFilePath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -19,18 +19,20 @@ function Convert-RazerProfileForUser {
             throw "The payload for Synapse profile '$($profile.name)' is not valid base64."
         }
 
-        $profileWasUpdated = $false
-        $userMatches = [regex]::Matches($payloadJson, 'C:\\\\Users\\\\(?<Username>[^\\]+)\\\\')
-        $hardcodedUsers = @($userMatches | ForEach-Object {
-            $_.Groups['Username'].Value
-        } | Sort-Object -Unique)
-
-        foreach ($hardcodedUser in $hardcodedUsers) {
-            if ($hardcodedUser -eq $TargetUsername) { continue }
-            $oldUserPath = 'C:\\Users\\' + $hardcodedUser + '\\'
-            $newUserPath = 'C:\\Users\\' + $TargetUsername + '\\'
-            $payloadJson = $payloadJson.Replace($oldUserPath, $newUserPath)
-            $profileWasUpdated = $true
+        $originalPayloadJson = $payloadJson
+        $ahkPathPattern = '[A-Za-z]:\\\\[^"\r\n]*?\\\\(?<FileName>[^"\\]+\.ahk)'
+        $payloadJson = [regex]::Replace(
+            $payloadJson,
+            $ahkPathPattern,
+            {
+                param($match)
+                $targetPath = Join-Path $TargetAhkDirectory $match.Groups['FileName'].Value
+                return $targetPath.Replace('\', '\\')
+            },
+            [Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+        $profileWasUpdated = $payloadJson -cne $originalPayloadJson
+        if ($profileWasUpdated) {
             $wasUpdated = $true
         }
 
@@ -92,7 +94,7 @@ function Install-TartarusProfileFromFolder {
     }
 
     $preparedProfile = Convert-RazerProfileForUser `
-        -ProfileFilePath $profileFile.FullName -TargetUsername $env:USERNAME
+        -ProfileFilePath $profileFile.FullName -TargetAhkDirectory $TartarusDestination
     $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
 
     New-Item -ItemType Directory -Path $TartarusDestination -Force | Out-Null
@@ -100,13 +102,6 @@ function Install-TartarusProfileFromFolder {
         -Destination $TartarusDestination -Recurse -Force
     $technicianProfilePath = Join-Path $TartarusDestination $profileFile.Name
     [IO.File]::WriteAllText($technicianProfilePath, [string]$preparedProfile.Content, $utf8WithoutBom)
-
-    $downloadsFolder = Join-Path $env:USERPROFILE 'Downloads'
-    New-Item -ItemType Directory -Path $downloadsFolder -Force | Out-Null
-    Get-ChildItem -LiteralPath $ProfileSourceFolder -Filter '*.ahk' -File |
-        ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination $downloadsFolder -Force
-        }
 
     $synapseImportDirectory = Get-RazerProfileImportDirectory -ProductId $preparedProfile.ProductId
     New-Item -ItemType Directory -Path $synapseImportDirectory -Force | Out-Null
