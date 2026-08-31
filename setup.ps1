@@ -21,6 +21,7 @@ $GcpwCloudManagementPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
 $WallpaperSource = Join-Path $ScriptDir 'Branding\Expert-Radiology-ExRad-Wallpaper-3840x2160.png'
 $WallpaperDestination = Join-Path $env:ProgramData 'ExpertRadiology\Branding\ExRad-Wallpaper-3840x2160.png'
 $WindowsPersonalizationPolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization'
+$script:RazerProfileImportPath = $null
 $DoneMark = [char]0x2713
 
 function Get-FirstFileName {
@@ -441,13 +442,162 @@ function Invoke-Installer {
     }
 }
 
-function Copy-TartarusKeybindings {
-    $destination = $TartarusDestination
+function Convert-RazerProfileForUser {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProfileFilePath,
+        [Parameter(Mandatory = $true)][string]$TargetUsername
+    )
 
+    $outerProfile = Get-Content -LiteralPath $ProfileFilePath -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    if ($null -eq $outerProfile.productId -or @($outerProfile.profiles).Count -eq 0) {
+        throw 'The Synapse profile does not contain a productId and at least one profile.'
+    }
+
+    $wasUpdated = $false
+    foreach ($profile in @($outerProfile.profiles)) {
+        try {
+            $payloadBytes = [Convert]::FromBase64String([string]$profile.payload)
+            $payloadJson = [Text.Encoding]::UTF8.GetString($payloadBytes)
+        }
+        catch {
+            throw "The payload for Synapse profile '$($profile.name)' is not valid base64."
+        }
+
+        $profileWasUpdated = $false
+        $userMatches = [regex]::Matches(
+            $payloadJson,
+            'C:\\\\Users\\\\(?<Username>[^\\]+)\\\\'
+        )
+        $hardcodedUsers = @($userMatches | ForEach-Object {
+            $_.Groups['Username'].Value
+        } | Sort-Object -Unique)
+
+        foreach ($hardcodedUser in $hardcodedUsers) {
+            if ($hardcodedUser -eq $TargetUsername) { continue }
+
+            $oldUserPath = 'C:\\Users\\' + $hardcodedUser + '\\'
+            $newUserPath = 'C:\\Users\\' + $TargetUsername + '\\'
+            $payloadJson = $payloadJson.Replace($oldUserPath, $newUserPath)
+            $profileWasUpdated = $true
+            $wasUpdated = $true
+        }
+
+        # Preserve untouched payloads and hashes. Re-encode and update the
+        # reference project's MD5 field only when a username actually changed.
+        if ($profileWasUpdated) {
+            $newPayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payloadJson))
+            $md5 = [Security.Cryptography.MD5]::Create()
+            try {
+                $hashBytes = $md5.ComputeHash([Text.Encoding]::UTF8.GetBytes($newPayload))
+                $newHash = ($hashBytes | ForEach-Object { $_.ToString('x2') }) -join ''
+            }
+            finally {
+                $md5.Dispose()
+            }
+            $profile.payload = $newPayload
+            $profile.hash = $newHash
+        }
+    }
+
+    return [pscustomobject]@{
+        Content = $outerProfile | ConvertTo-Json -Depth 100
+        ProductId = [string]$outerProfile.productId
+        WasUpdated = $wasUpdated
+    }
+}
+
+function Get-RazerProfileImportDirectory {
+    param([Parameter(Mandatory = $true)][string]$ProductId)
+
+    $synapse4Base = Join-Path $env:LOCALAPPDATA 'Razer\Synapse4'
+    $synapse3Base = Join-Path $env:LOCALAPPDATA 'Razer\Synapse3'
+    if (Test-Path -LiteralPath $synapse4Base) {
+        return Join-Path $synapse4Base "ProductProfiles\$ProductId"
+    }
+    if (Test-Path -LiteralPath $synapse3Base) {
+        return Join-Path $synapse3Base 'Profiles'
+    }
+
+    # Synapse creates its per-user folders after first launch. Stage for
+    # Synapse 4 when neither version has initialized yet.
+    return Join-Path $synapse4Base "ProductProfiles\$ProductId"
+}
+
+function Test-TartarusProfilePrepared {
+    if (-not (Test-Path -LiteralPath $SourceFolder)) { return $false }
+
+    try {
+        $profileFile = Get-ChildItem -LiteralPath $SourceFolder -Filter '*.synapse4' -File |
+            Sort-Object Name |
+            Select-Object -First 1
+        if ($null -eq $profileFile) { return $false }
+
+        $outerProfile = Get-Content -LiteralPath $profileFile.FullName -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+        $importDirectory = Get-RazerProfileImportDirectory `
+            -ProductId ([string]$outerProfile.productId)
+        return Test-Path -LiteralPath (Join-Path $importDirectory $profileFile.Name)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Install-TartarusProfileFromFolder {
+    param([Parameter(Mandatory = $true)][string]$ProfileSourceFolder)
+
+    $profileFile = Get-ChildItem -LiteralPath $ProfileSourceFolder -Filter '*.synapse4' -File |
+        Sort-Object Name |
+        Select-Object -First 1
+    if ($null -eq $profileFile) {
+        throw 'No .synapse4 profile was found in the Tartarus source folder.'
+    }
+
+    $preparedProfile = Convert-RazerProfileForUser `
+        -ProfileFilePath $profileFile.FullName `
+        -TargetUsername $env:USERNAME
+    $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
+
+    # Keep a technician-accessible copy and the accompanying AHK scripts.
+    New-Item -ItemType Directory -Path $TartarusDestination -Force | Out-Null
+    Copy-Item -Path (Join-Path $ProfileSourceFolder '*') `
+        -Destination $TartarusDestination -Recurse -Force
+    $technicianProfilePath = Join-Path $TartarusDestination $profileFile.Name
+    [IO.File]::WriteAllText(
+        $technicianProfilePath,
+        [string]$preparedProfile.Content,
+        $utf8WithoutBom
+    )
+
+    # AHK launch paths in exported profiles point at the current Downloads folder.
+    $downloadsFolder = Join-Path $env:USERPROFILE 'Downloads'
+    New-Item -ItemType Directory -Path $downloadsFolder -Force | Out-Null
+    Get-ChildItem -LiteralPath $ProfileSourceFolder -Filter '*.ahk' -File |
+        ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $downloadsFolder -Force
+        }
+
+    $synapseImportDirectory = Get-RazerProfileImportDirectory `
+        -ProductId $preparedProfile.ProductId
+    New-Item -ItemType Directory -Path $synapseImportDirectory -Force | Out-Null
+    $synapseProfilePath = Join-Path $synapseImportDirectory $profileFile.Name
+    [IO.File]::WriteAllText(
+        $synapseProfilePath,
+        [string]$preparedProfile.Content,
+        $utf8WithoutBom
+    )
+
+    return [pscustomobject]@{
+        ImportPath = $synapseProfilePath
+        TechnicianCopy = $technicianProfilePath
+        UsernamePatched = [bool]$preparedProfile.WasUpdated
+    }
+}
+
+function Copy-TartarusKeybindings {
     if (Test-Path -LiteralPath $SourceFolder) {
-        New-Item -ItemType Directory -Path $destination -Force | Out-Null
-        Copy-Item -Path (Join-Path $SourceFolder '*') -Destination $destination -Recurse -Force
-        return
+        return Install-TartarusProfileFromFolder -ProfileSourceFolder $SourceFolder
     }
 
     if (Test-Path -LiteralPath $SourceZip) {
@@ -456,15 +606,13 @@ function Copy-TartarusKeybindings {
             Expand-Archive -LiteralPath $SourceZip -DestinationPath $tempFolder -Force
             $nestedSource = Join-Path $tempFolder 'Tartarus_Keybindings'
             if (-not (Test-Path -LiteralPath $nestedSource)) { $nestedSource = $tempFolder }
-            New-Item -ItemType Directory -Path $destination -Force | Out-Null
-            Copy-Item -Path (Join-Path $nestedSource '*') -Destination $destination -Recurse -Force
+            return Install-TartarusProfileFromFolder -ProfileSourceFolder $nestedSource
         }
         finally {
             if (Test-Path -LiteralPath $tempFolder) {
                 Remove-Item -LiteralPath $tempFolder -Recurse -Force
             }
         }
-        return
     }
 
     throw 'Neither the Tartarus_Keybindings folder nor Tartarus_Keybindings.zip was found.'
@@ -549,14 +697,14 @@ foreach ($app in $Apps) {
 }
 
 $copyTartarusCB = New-Object System.Windows.Forms.CheckBox
-$tartarusAlreadyExists = Test-Path -LiteralPath $TartarusDestination
-if ($tartarusAlreadyExists) {
-    $copyTartarusCB.Text = 'Update Tartarus Keybindings in Documents (Folder Exists)'
+$tartarusAlreadyPrepared = Test-TartarusProfilePrepared
+if ($tartarusAlreadyPrepared) {
+    $copyTartarusCB.Text = 'Refresh Tartarus profile for Synapse import (Already Staged)'
     $copyTartarusCB.ForeColor = [System.Drawing.Color]::Gray
     $copyTartarusCB.Checked = $false
 }
 else {
-    $copyTartarusCB.Text = 'Copy Tartarus Keybindings to Documents'
+    $copyTartarusCB.Text = 'Prepare Tartarus profile for Synapse import'
     $copyTartarusCB.Checked = $true
 }
 $copyTartarusCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
@@ -636,7 +784,7 @@ $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
         $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
     }
-    $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyExists
+    $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyPrepared
     $applyGcpwTokenCB.Checked = $selectAllCB.Checked -and `
         $gcpwTokenFileExists -and -not $gcpwTokenAlreadyConfigured
     $applyWallpaperCB.Checked = $selectAllCB.Checked -and `
@@ -698,17 +846,18 @@ $btnStart.Add_Click({
 
     if ($copyTartarusCB.Checked) {
         try {
-            $copyTartarusCB.Text = 'Copy Tartarus Keybindings - Copying...'
-            $statusText.Text = 'Copying Tartarus keybindings...'
+            $copyTartarusCB.Text = 'Tartarus profile - Preparing...'
+            $statusText.Text = 'Preparing Tartarus profile for Synapse...'
             [System.Windows.Forms.Application]::DoEvents()
-            Copy-TartarusKeybindings
-            $copyTartarusCB.Text = "Copy Tartarus Keybindings - [$DoneMark Done]"
+            $tartarusResult = Copy-TartarusKeybindings
+            $script:RazerProfileImportPath = $tartarusResult.ImportPath
+            $copyTartarusCB.Text = "Tartarus profile - [$DoneMark Ready to import]"
             $copyTartarusCB.ForeColor = [System.Drawing.Color]::Green
         }
         catch {
-            $copyTartarusCB.Text = 'Copy Tartarus Keybindings - Failed'
+            $copyTartarusCB.Text = 'Tartarus profile - Failed'
             $copyTartarusCB.ForeColor = [System.Drawing.Color]::Red
-            $failures.Add("Tartarus keybindings: $($_.Exception.Message)")
+            $failures.Add("Tartarus profile: $($_.Exception.Message)")
         }
     }
 
@@ -778,6 +927,12 @@ $btnStart.Add_Click({
         else {
             $statusText.Text = 'Deployment complete.'
         }
+        if (-not [string]::IsNullOrWhiteSpace($script:RazerProfileImportPath)) {
+            $completionMessage += [Environment]::NewLine + [Environment]::NewLine +
+                'Tartarus profile prepared. In Razer Synapse, choose Use without account, ' +
+                'open the profile Import screen, and select:' + [Environment]::NewLine +
+                $script:RazerProfileImportPath
+        }
         [System.Windows.Forms.MessageBox]::Show(
             $completionMessage, 'Done',
             [System.Windows.Forms.MessageBoxButtons]::OK,
@@ -791,6 +946,11 @@ $btnStart.Add_Click({
         if ($restartRequired) {
             $failureMessage += [Environment]::NewLine + [Environment]::NewLine +
                 'The GCPW token was applied. Restart Windows before the first GCPW sign-in.'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($script:RazerProfileImportPath)) {
+            $failureMessage += [Environment]::NewLine + [Environment]::NewLine +
+                'The Tartarus profile is ready for manual import from:' +
+                [Environment]::NewLine + $script:RazerProfileImportPath
         }
         [System.Windows.Forms.MessageBox]::Show(
             $failureMessage, 'Deployment errors',

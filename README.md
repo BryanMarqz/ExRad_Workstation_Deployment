@@ -37,8 +37,8 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 
 Installer binaries are ignored by Git and remain local to the deployment folder.
 
-`Tartarus_Keybindings` contains the deployment profile and its AutoHotkey v2
-actions:
+`Tartarus_Keybindings` contains the exported Synapse profile and its optional
+AutoHotkey v2 actions:
 
 - `Default-Profile.synapse4`
 - `Play.ahk`
@@ -61,8 +61,8 @@ token is applied and before the first GCPW sign-in.
 4. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
 5. Review `configuration.xml` and the bookmarks in `setup.ps1`.
 6. Double-click `run.bat` and approve the Administrator prompt.
-7. Select the applications, GCPW token, wallpaper, and optional Tartarus copy
-   operation.
+7. Select the applications, GCPW token, wallpaper, and optional Tartarus profile
+   preparation.
 8. Click **Start Installation**.
 
 ```powershell
@@ -78,7 +78,19 @@ when necessary. Razer Synapse uses its interactive installer.
 
 - Designed for Windows PowerShell 5.1 and Windows 10/11.
 - Microsoft 365 configuration installs Word while excluding the other listed apps.
-- Tartarus files are copied to `Documents\Tartarus Keybindings` only when selected.
+- When Tartarus profile preparation is selected, the script validates and
+  decodes every base64 profile payload. If it finds an AHK path containing a
+  different `C:\Users\<name>` value, it substitutes the current Windows
+  username, re-encodes the payload, and recalculates the profile MD5 field.
+- The prepared `.synapse4` file is kept in `Documents\Tartarus Keybindings` and
+  staged in the detected Synapse 3 or Synapse 4 profile directory. Any included
+  `.ahk` files are also copied to the current user's `Downloads` folder so
+  exported launch paths remain valid.
+- This workflow intentionally leaves the final import confirmation to the
+  technician. On first Synapse launch, choose **Use without account**, open the
+  profile import screen, and select the path displayed by the deployment
+  completion message. Importing the prepared profile applies all mappings; the
+  technician does not recreate them individually.
 - AutoHotkey v2 detection checks system-wide and per-user installation paths,
   uninstall registry records, and executables available on `PATH`.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
