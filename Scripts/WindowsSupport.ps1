@@ -1,5 +1,5 @@
 $WindowsSupportRegistryPath = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation'
-$ExRadSupportProvider = 'Email: support@expertradiology.com'
+$ExRadSupportProvider = 'expertradiology.com'
 $ExRadSupportUrl = 'https://expertradiology.com'
 
 function Test-ExRadWindowsSupportConfigured {

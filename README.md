@@ -157,9 +157,9 @@ when necessary. Razer Synapse uses its interactive installer.
   lock/sign-in image. Windows 11 Enterprise and Education honor the managed
   lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
   editions.
-- Windows support information is configured under the standard OEM information
-  key. Windows can display `Email: support@expertradiology.com` as the support
-  provider and link `https://expertradiology.com` as the support website. The
+- Windows website information is configured under the standard OEM information
+  key. Windows displays `expertradiology.com` as the provider link and opens
+  `https://expertradiology.com` when it is selected. The
   exact placement varies by Windows 11 build; Windows does not offer a separate
   modern OEM email field.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
