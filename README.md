@@ -163,8 +163,9 @@ when necessary. Razer Synapse uses its interactive installer.
   lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
   editions.
 - Windows website information is configured under the standard OEM information
-  key. Windows displays `expertradiology.com` as the provider link and opens
-  `https://expertradiology.com` when it is selected. The
+  key. Windows displays
+  `support@expertradiology.com | expertradiology.com` as the provider link and
+  opens `https://expertradiology.com` when it is selected. The
   exact placement varies by Windows 11 build; Windows does not offer a separate
   modern OEM email field.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
