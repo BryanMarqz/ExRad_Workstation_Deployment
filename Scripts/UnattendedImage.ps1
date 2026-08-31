@@ -4,12 +4,30 @@ $SysprepExecutable = Join-Path $env:WINDIR 'System32\Sysprep\Sysprep.exe'
 $GeneratedUnattendFile = Join-Path $env:WINDIR 'Panther\ExRad-Unattend.xml'
 
 function Test-WindowsAuditMode {
+    # Windows normally exposes this flag while Audit Mode is active, but some
+    # Windows 11 builds remove it after the auditUser pass has completed.
     try {
         $auditInProgress = (Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\Setup' `
             -Name 'AuditInProgress' -ErrorAction Stop).AuditInProgress
-        return [int]$auditInProgress -eq 1
+        if ([int]$auditInProgress -eq 1) {
+            return $true
+        }
     }
-    catch { return $false }
+    catch {
+        # Fall through to the account check below.
+    }
+
+    # Audit Mode signs in with Windows' built-in Administrator account. Its SID
+    # always has RID 500, even if the account has been renamed or localized.
+    # Regular administrator accounts have a different RID and do not pass this
+    # fallback check.
+    try {
+        $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        return $currentSid -match '-500$'
+    }
+    catch {
+        return $false
+    }
 }
 
 function Test-LocalUserExists {
