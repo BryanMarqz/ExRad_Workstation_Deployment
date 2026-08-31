@@ -38,7 +38,7 @@ ExRad_Workstation_Deployment/
 |   `-- WindowsSupport.ps1    Windows support-provider information
 |-- Tartarus_Keybindings/     Synapse profile and AHK actions
 |-- Download-Installers.ps1   Verified installer downloader
-|-- Run-Deployment.bat        Administrator deployment launcher
+|-- START-EXRAD-DEPLOYMENT.bat  Double-click this to begin
 `-- setup.ps1                 Small component loader/entry point
 ```
 
@@ -91,7 +91,7 @@ token is applied and before the first GCPW sign-in.
    customer-specific.
 5. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
    `Scripts\ChromePolicies.ps1`.
-6. Double-click `Run-Deployment.bat` and approve the Administrator prompt.
+6. Double-click `START-EXRAD-DEPLOYMENT.bat` and approve the Administrator prompt.
 7. Select the applications, GCPW token, wallpaper, and optional Tartarus profile
    preparation.
 8. Click **Start Installation**.
