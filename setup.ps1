@@ -18,6 +18,9 @@ $SourceZip = Join-Path $ScriptDir 'Tartarus_Keybindings.zip'
 $TartarusDestination = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Tartarus Keybindings'
 $GcpwTokenFile = Join-Path $ScriptDir 'set_gcpw_token.reg'
 $GcpwCloudManagementPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
+$WallpaperSource = Join-Path $ScriptDir 'Branding\Expert-Radiology-ExRad-Wallpaper-3840x2160.png'
+$WallpaperDestination = Join-Path $env:ProgramData 'ExpertRadiology\Branding\ExRad-Wallpaper-3840x2160.png'
+$WindowsPersonalizationPolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization'
 $DoneMark = [char]0x2713
 
 function Get-FirstFileName {
@@ -200,6 +203,106 @@ function Set-GcpwEnrollmentToken {
     }
 }
 
+function Test-ExRadWallpaperConfigured {
+    if (-not (Test-Path -LiteralPath $WallpaperSource) -or
+        -not (Test-Path -LiteralPath $WallpaperDestination)) {
+        return $false
+    }
+
+    try {
+        $sourceHash = (Get-FileHash -LiteralPath $WallpaperSource -Algorithm SHA256).Hash
+        $destinationHash = (Get-FileHash -LiteralPath $WallpaperDestination -Algorithm SHA256).Hash
+        $desktopWallpaper = (Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Desktop' `
+            -Name 'Wallpaper' -ErrorAction Stop).Wallpaper
+        $lockScreenWallpaper = (Get-ItemProperty -LiteralPath $WindowsPersonalizationPolicyPath `
+            -Name 'LockScreenImage' -ErrorAction Stop).LockScreenImage
+        return $sourceHash -eq $destinationHash -and
+            $desktopWallpaper -eq $WallpaperDestination -and
+            $lockScreenWallpaper -eq $WallpaperDestination
+    }
+    catch {
+        return $false
+    }
+}
+
+function Set-DesktopWallpaperRegistry {
+    param([Parameter(Mandatory = $true)][string]$RegistryPath)
+
+    if (-not (Test-Path -LiteralPath $RegistryPath)) {
+        New-Item -Path $RegistryPath -Force | Out-Null
+    }
+    New-ItemProperty -LiteralPath $RegistryPath -Name 'Wallpaper' `
+        -Value $WallpaperDestination -PropertyType String -Force | Out-Null
+    New-ItemProperty -LiteralPath $RegistryPath -Name 'WallpaperStyle' `
+        -Value '10' -PropertyType String -Force | Out-Null
+    New-ItemProperty -LiteralPath $RegistryPath -Name 'TileWallpaper' `
+        -Value '0' -PropertyType String -Force | Out-Null
+}
+
+function Set-ExRadWallpaper {
+    if (-not (Test-Path -LiteralPath $WallpaperSource)) {
+        throw 'The ExRad wallpaper image was not found in the Branding folder.'
+    }
+
+    $brandingFolder = Split-Path -Parent $WallpaperDestination
+    New-Item -ItemType Directory -Path $brandingFolder -Force | Out-Null
+    Copy-Item -LiteralPath $WallpaperSource -Destination $WallpaperDestination -Force
+
+    # Apply immediately for the technician/current user.
+    Set-DesktopWallpaperRegistry -RegistryPath 'HKCU:\Control Panel\Desktop'
+    if (-not ('ExRadWallpaper.NativeMethods' -as [type])) {
+        Add-Type -TypeDefinition @'
+namespace ExRadWallpaper {
+    using System.Runtime.InteropServices;
+    public static class NativeMethods {
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern bool SystemParametersInfo(
+            int action, int parameter, string value, int flags);
+    }
+}
+'@
+    }
+    $wallpaperApplied = [ExRadWallpaper.NativeMethods]::SystemParametersInfo(
+        20, 0, $WallpaperDestination, 3
+    )
+    if (-not $wallpaperApplied) {
+        throw "Windows could not refresh the current desktop wallpaper (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))."
+    }
+
+    # Windows uses this managed image for both the lock and sign-in screens.
+    if (-not (Test-Path -LiteralPath $WindowsPersonalizationPolicyPath)) {
+        New-Item -Path $WindowsPersonalizationPolicyPath -Force | Out-Null
+    }
+    New-ItemProperty -LiteralPath $WindowsPersonalizationPolicyPath -Name 'LockScreenImage' `
+        -Value $WallpaperDestination -PropertyType String -Force | Out-Null
+
+    # Seed the desktop wallpaper for accounts created after deployment.
+    $defaultUserHive = Join-Path $env:SystemDrive 'Users\Default\NTUSER.DAT'
+    $defaultUserHiveName = 'ExRadDeploymentDefaultUser'
+    if (Test-Path -LiteralPath $defaultUserHive) {
+        & reg.exe load "HKU\$defaultUserHiveName" $defaultUserHive | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Windows could not load the default user profile to set its wallpaper.'
+        }
+        try {
+            Set-DesktopWallpaperRegistry -RegistryPath `
+                "Registry::HKEY_USERS\$defaultUserHiveName\Control Panel\Desktop"
+        }
+        finally {
+            [GC]::Collect()
+            [GC]::WaitForPendingFinalizers()
+            & reg.exe unload "HKU\$defaultUserHiveName" | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw 'The default user registry profile could not be unloaded.'
+            }
+        }
+    }
+
+    if (-not (Test-ExRadWallpaperConfigured)) {
+        throw 'The wallpaper settings could not be verified after they were applied.'
+    }
+}
+
 # Generated NinjaOne installers contain an enrollment token. Keep them local.
 $NinjaFile = Get-FirstFileName -Filter 'NinjaOne-Agent*-Auto-*.msi' -Fallback 'NinjaOne-Agent-Auto-x86-64.msi'
 $SlackFile = Get-FirstFileName -Filter 'Slack*.msix*' -Fallback 'Slack.msix'
@@ -369,7 +472,7 @@ function Copy-TartarusKeybindings {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Automated Workstation Deployment - Preflight'
-$form.Size = New-Object System.Drawing.Size(720, 560)
+$form.Size = New-Object System.Drawing.Size(720, 610)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
@@ -496,6 +599,39 @@ $form.Controls.Add($applyGcpwTokenCB)
 $form.Controls.Add($gcpwTokenStatus)
 $yPos += 28
 
+$applyWallpaperCB = New-Object System.Windows.Forms.CheckBox
+$applyWallpaperCB.Text = 'Apply ExRad desktop and lock/sign-in wallpaper'
+$applyWallpaperCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$applyWallpaperCB.Size = New-Object System.Drawing.Size(320, 25)
+$applyWallpaperCB.Location = New-Object System.Drawing.Point(25, $yPos)
+
+$wallpaperStatus = New-Object System.Windows.Forms.Label
+$wallpaperStatus.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$wallpaperStatus.Size = New-Object System.Drawing.Size(315, 25)
+$wallpaperStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
+
+$wallpaperAlreadyConfigured = Test-ExRadWallpaperConfigured
+$wallpaperSourceExists = Test-Path -LiteralPath $WallpaperSource
+if ($wallpaperAlreadyConfigured) {
+    $applyWallpaperCB.Checked = $false
+    $wallpaperStatus.Text = 'Already configured'
+    $wallpaperStatus.ForeColor = [System.Drawing.Color]::Green
+}
+elseif ($wallpaperSourceExists) {
+    $applyWallpaperCB.Checked = $true
+    $wallpaperStatus.Text = 'Wallpaper ready'
+    $wallpaperStatus.ForeColor = [System.Drawing.Color]::DarkGreen
+}
+else {
+    $applyWallpaperCB.Checked = $false
+    $applyWallpaperCB.Enabled = $false
+    $wallpaperStatus.Text = 'Image missing'
+    $wallpaperStatus.ForeColor = [System.Drawing.Color]::Red
+}
+$form.Controls.Add($applyWallpaperCB)
+$form.Controls.Add($wallpaperStatus)
+$yPos += 28
+
 $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
         $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
@@ -503,6 +639,8 @@ $selectAllCB.Add_CheckedChanged({
     $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyExists
     $applyGcpwTokenCB.Checked = $selectAllCB.Checked -and `
         $gcpwTokenFileExists -and -not $gcpwTokenAlreadyConfigured
+    $applyWallpaperCB.Checked = $selectAllCB.Checked -and `
+        $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
 })
 
 $statusText = New-Object System.Windows.Forms.Label
@@ -524,6 +662,7 @@ $btnStart.Add_Click({
     $selectAllCB.Enabled = $false
     $copyTartarusCB.Enabled = $false
     $applyGcpwTokenCB.Enabled = $false
+    $applyWallpaperCB.Enabled = $false
     $failures = New-Object System.Collections.Generic.List[string]
     $restartRequired = $false
 
@@ -591,6 +730,23 @@ $btnStart.Add_Click({
         }
     }
 
+    if ($applyWallpaperCB.Checked) {
+        try {
+            $wallpaperStatus.Text = 'Applying...'
+            $wallpaperStatus.ForeColor = [System.Drawing.Color]::DarkBlue
+            $statusText.Text = 'Applying ExRad wallpaper...'
+            [System.Windows.Forms.Application]::DoEvents()
+            Set-ExRadWallpaper
+            $wallpaperStatus.Text = "[$DoneMark Done] Applied"
+            $wallpaperStatus.ForeColor = [System.Drawing.Color]::Green
+        }
+        catch {
+            $wallpaperStatus.Text = 'Failed'
+            $wallpaperStatus.ForeColor = [System.Drawing.Color]::Red
+            $failures.Add("ExRad wallpaper: $($_.Exception.Message)")
+        }
+    }
+
     try {
         $statusText.Text = 'Applying Chrome policies...'
         [System.Windows.Forms.Application]::DoEvents()
@@ -644,6 +800,7 @@ $btnStart.Add_Click({
         $btnStart.Enabled = $true
         $copyTartarusCB.Enabled = $true
         $applyGcpwTokenCB.Enabled = $gcpwTokenFileExists -and -not $gcpwTokenAlreadyConfigured
+        $applyWallpaperCB.Enabled = $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
     }
 })
 

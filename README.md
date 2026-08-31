@@ -2,7 +2,8 @@
 
 PowerShell-based Windows workstation deployment utility with a graphical app
 selector. It installs locally supplied software packages, copies optional Razer
-Tartarus keybindings, and configures managed Chrome bookmarks.
+Tartarus keybindings, applies ExRad desktop and lock/sign-in branding, and
+configures managed Chrome bookmarks.
 
 The preflight view shows the current state of every application before the
 deployment starts: **Installed**, **Installer ready**, **Installer missing**,
@@ -60,7 +61,8 @@ token is applied and before the first GCPW sign-in.
 4. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
 5. Review `configuration.xml` and the bookmarks in `setup.ps1`.
 6. Double-click `run.bat` and approve the Administrator prompt.
-7. Select the applications, GCPW token, and optional Tartarus copy operation.
+7. Select the applications, GCPW token, wallpaper, and optional Tartarus copy
+   operation.
 8. Click **Start Installation**.
 
 ```powershell
@@ -80,6 +82,12 @@ when necessary. Razer Synapse uses its interactive installer.
 - AutoHotkey v2 detection checks system-wide and per-user installation paths,
   uninstall registry records, and executables available on `PATH`.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
+- The included image in `Branding` is copied to
+  `C:\ProgramData\ExpertRadiology\Branding`, applied immediately to the current
+  desktop, seeded for new Windows profiles, and configured as the managed
+  lock/sign-in image. Windows 11 Enterprise and Education honor the managed
+  lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
+  editions.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
   package for the exact GPU, computer manufacturer, and Windows version.
 - NVIDIA uses display-driver-only silent installation and is selected only when
