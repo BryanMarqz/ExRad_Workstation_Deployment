@@ -6,8 +6,23 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$DestinationRoot = $PSScriptRoot
+$DestinationRoot = Join-Path $PSScriptRoot 'Installers'
+$PrivateRoot = Join-Path $PSScriptRoot 'Private'
+New-Item -ItemType Directory -Path $DestinationRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $PrivateRoot -Force | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+function Move-LegacyInstaller {
+    param([Parameter(Mandatory = $true)][string]$FileName)
+
+    $legacyPath = Join-Path $PSScriptRoot $FileName
+    $organizedPath = Join-Path $DestinationRoot $FileName
+    if ((Test-Path -LiteralPath $legacyPath) -and
+        -not (Test-Path -LiteralPath $organizedPath)) {
+        Move-Item -LiteralPath $legacyPath -Destination $organizedPath
+        Write-Host "[MOVED] $FileName -> Installers" -ForegroundColor DarkCyan
+    }
+}
 
 function Test-ExpectedSignature {
     param(
@@ -32,6 +47,7 @@ function Get-SignedInstaller {
         [Parameter(Mandatory = $true)][string]$PublisherPattern
     )
 
+    Move-LegacyInstaller -FileName $FileName
     $destination = Join-Path $DestinationRoot $FileName
     if ((Test-Path -LiteralPath $destination) -and -not $Force) {
         Write-Host "[SKIP] $Name already exists: $FileName" -ForegroundColor Yellow
@@ -61,6 +77,7 @@ function Get-HashedInstaller {
         [Parameter(Mandatory = $true)][string]$Sha256
     )
 
+    Move-LegacyInstaller -FileName $FileName
     $destination = Join-Path $DestinationRoot $FileName
     if ((Test-Path -LiteralPath $destination) -and -not $Force) {
         Write-Host "[SKIP] $Name already exists: $FileName" -ForegroundColor Yellow
@@ -143,13 +160,16 @@ if ([string]::IsNullOrWhiteSpace($NinjaOneUrl)) {
     $NinjaOneUrl = $env:NINJAONE_INSTALLER_URL
 }
 
-$ninjaUrlFile = Join-Path $DestinationRoot 'ninjaone-url.txt'
+$ninjaUrlFile = Join-Path $PrivateRoot 'ninjaone-url.txt'
+if (-not (Test-Path -LiteralPath $ninjaUrlFile)) {
+    $ninjaUrlFile = Join-Path $PSScriptRoot 'ninjaone-url.txt'
+}
 if ([string]::IsNullOrWhiteSpace($NinjaOneUrl) -and (Test-Path -LiteralPath $ninjaUrlFile)) {
     $NinjaOneUrl = (Get-Content -LiteralPath $ninjaUrlFile -Raw).Trim()
 }
 
 if ([string]::IsNullOrWhiteSpace($NinjaOneUrl)) {
-    Write-Warning 'NinjaOne skipped. Add the private installer URL to ninjaone-url.txt.'
+    Write-Warning 'NinjaOne skipped. Add the private installer URL to Private\ninjaone-url.txt.'
 }
 else {
     try {
@@ -173,4 +193,5 @@ else {
 
 Write-Host ''
 Write-Host 'Download step complete.' -ForegroundColor Green
-Write-Host 'RamSoftLauncherSetup.exe must still be added manually.' -ForegroundColor Yellow
+Write-Host "Installers folder: $DestinationRoot" -ForegroundColor Green
+Write-Host 'RamSoftLauncherSetup.exe must still be added manually to the Installers folder.' -ForegroundColor Yellow

@@ -5,6 +5,7 @@
 *.msixbundle
 *.appx
 *.appxbundle
+*.download
 
 # Archives and generated files
 *.zip

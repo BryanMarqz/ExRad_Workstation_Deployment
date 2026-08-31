@@ -18,9 +18,37 @@ or `set_gcpw_token.reg`: both contain organization enrollment information.
 Download all installers from their official vendor portals and verify their
 digital signatures before use.
 
+## Folder layout
+
+```text
+ExRad_Workstation_Deployment/
+|-- Branding/                 ExRad wallpaper
+|-- Config/                   Non-secret deployment configuration
+|-- Installers/               Local MSI, MSIX, and EXE packages
+|-- Private/                  Ignored enrollment inputs
+|-- Scripts/                  Modular deployment components
+|   |-- AppCatalog.ps1        Application definitions
+|   |-- ChromePolicies.ps1    Managed Chrome bookmarks
+|   |-- DeploymentUI.ps1      Preflight window and workflow
+|   |-- Gcpw.ps1              GCPW enrollment
+|   |-- InstallerEngine.ps1   Detection and installation logic
+|   |-- Tartarus.ps1          Synapse profile preparation
+|   |-- UnattendedImage.ps1   Audit Mode and Sysprep image workflow
+|   |-- Wallpaper.ps1         Desktop and lock-screen branding
+|   `-- WindowsSupport.ps1    Windows support-provider information
+|-- Tartarus_Keybindings/     Synapse profile and AHK actions
+|-- Download-Installers.ps1   Verified installer downloader
+|-- Run-Deployment.bat        Administrator deployment launcher
+`-- setup.ps1                 Small component loader/entry point
+```
+
+Installer binaries inside `Installers` remain ignored by Git. For backward
+compatibility, `setup.ps1` also detects installers left beside the script, but
+new downloads and manually supplied packages should use `Installers`.
+
 ## Required local files
 
-Place these files beside `setup.ps1` after cloning or downloading the repository:
+Place these files in `Installers` after cloning or downloading the repository:
 
 | Application | Expected filename/pattern |
 | --- | --- |
@@ -35,7 +63,8 @@ Place these files beside `setup.ps1` after cloning or downloading the repository
 | NVIDIA graphics driver | `NVIDIA-Driver*.exe` or `*-desktop-win10-win11-64bit-*-dch-whql.exe` |
 | AMD graphics driver (optional) | `AMD-Driver*.exe` or `*amd-software-adrenalin-edition-*.exe` |
 
-Installer binaries are ignored by Git and remain local to the deployment folder.
+Installer binaries are ignored by Git and remain local to the `Installers`
+folder.
 
 `Tartarus_Keybindings` contains the exported Synapse profile and its optional
 AutoHotkey v2 actions:
@@ -44,7 +73,7 @@ AutoHotkey v2 actions:
 - `Play.ahk`
 - `Record.ahk`
 
-Optionally place `set_gcpw_token.reg` beside `setup.ps1`. The preflight screen
+Optionally place `set_gcpw_token.reg` in `Private`. The preflight screen
 will offer **Apply GCPW enrollment token**. The script reads only the
 `EnrollmentToken` value for the approved Google CloudManagement policy key,
 writes that value after installation, and verifies it without displaying it.
@@ -53,17 +82,45 @@ token is applied and before the first GCPW sign-in.
 
 ## Run
 
-1. Create a local `ninjaone-url.txt` beside the scripts and paste the generated
-   NinjaOne Auto-installer URL into it. This ignored file must never be committed.
+1. Create `Private\ninjaone-url.txt` and paste the generated NinjaOne
+   Auto-installer URL into it. This ignored file must never be committed.
 2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
    local NinjaOne package, then verifies signatures or the published hash.
-3. If GCPW enrollment is needed, add the private `set_gcpw_token.reg` file.
-4. Add `RamSoftLauncherSetup.exe` manually because it is customer-specific.
-5. Review `configuration.xml` and the bookmarks in `setup.ps1`.
-6. Double-click `run.bat` and approve the Administrator prompt.
+3. If GCPW enrollment is needed, add `Private\set_gcpw_token.reg`.
+4. Add `RamSoftLauncherSetup.exe` to `Installers` manually because it is
+   customer-specific.
+5. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
+   `Scripts\ChromePolicies.ps1`.
+6. Double-click `Run-Deployment.bat` and approve the Administrator prompt.
 7. Select the applications, GCPW token, wallpaper, and optional Tartarus profile
    preparation.
 8. Click **Start Installation**.
+
+## Optional generalized image workflow
+
+On a reference PC, enter Windows Audit Mode, run the deployment, and manually
+enable **Generalize image after deployment (Sysprep + shutdown)**. This option is
+disabled outside Audit Mode and is never selected by **Select All**.
+
+After the normal deployment finishes successfully, the script:
+
+1. Prompts twice for a password of at least 12 characters for the local `Admin`
+   account. The password is never saved in the repository.
+2. Generates a temporary Windows answer file from
+   `Config\Unattend-OOBE-Template.xml`.
+3. Adds pre-login `SetupComplete.cmd` cleanup, with first-login cleanup as a
+   fallback, to remove cached answer files containing the reversible password
+   value.
+4. Requests final confirmation, then runs `Sysprep /generalize /oobe /shutdown`.
+5. Shuts down the reference PC so the generalized Windows volume can be captured
+   offline with the organization's imaging tool.
+
+The answer file creates a local `Admin` account without auto-logon and automates
+the supported Windows 11 OOBE pages, so a deployed workstation should stop at
+the Windows login screen. Microsoft warns against using `SkipMachineOOBE`, so
+the template intentionally omits both legacy `SkipMachineOOBE` and
+`SkipUserOOBE`. Unattend-created local accounts do not require interactive
+security-question answers.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1
@@ -100,6 +157,11 @@ when necessary. Razer Synapse uses its interactive installer.
   lock/sign-in image. Windows 11 Enterprise and Education honor the managed
   lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
   editions.
+- Windows support information is configured under the standard OEM information
+  key. Windows can display `Email: support@expertradiology.com` as the support
+  provider and link `https://expertradiology.com` as the support website. The
+  exact placement varies by Windows 11 build; Windows does not offer a separate
+  modern OEM email field.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
   package for the exact GPU, computer manufacturer, and Windows version.
 - NVIDIA uses display-driver-only silent installation and is selected only when
