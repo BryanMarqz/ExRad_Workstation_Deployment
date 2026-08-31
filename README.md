@@ -102,6 +102,11 @@ On a reference PC, enter Windows Audit Mode, run the deployment, and manually
 enable **Generalize image after deployment (Sysprep + shutdown)**. This option is
 disabled outside Audit Mode and is never selected by **Select All**.
 
+NinjaOne is also off by default and excluded from **Select All**. For a golden
+image, install NinjaOne after applying the image so each workstation registers
+with its own device identity. If NinjaOne must be captured in the image, follow
+NinjaOne's vendor-supported `noclone` preparation procedure before capture.
+
 After the normal deployment finishes successfully, the script:
 
 1. Prompts twice for a password of at least 12 characters for the local `Admin`

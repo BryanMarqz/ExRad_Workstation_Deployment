@@ -30,6 +30,7 @@ $form.Controls.Add($statusHeader)
 $checkBoxes = @{}
 $preflightLabels = @{}
 $selectAllEligibleApps = @{}
+$appToolTip = New-Object System.Windows.Forms.ToolTip
 $yPos = 75
 
 foreach ($app in $Apps) {
@@ -55,6 +56,13 @@ foreach ($app in $Apps) {
     else {
         $cb.Text = $app.Name
         $cb.Checked = $defaultSelected
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$app.DisplayNote)) {
+        $cb.Text = "$($app.Name) ($($app.DisplayNote))"
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string]$app.HelpText)) {
+        $appToolTip.SetToolTip($cb, [string]$app.HelpText)
     }
 
     $cb.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
