@@ -1,6 +1,9 @@
 # Generated NinjaOne installers contain an enrollment token. Keep them local.
 $NinjaFile = Get-FirstFileName -Filter 'NinjaOne-Agent*-Auto-*.msi' -Fallback 'NinjaOne-Agent-Auto-x86-64.msi'
 $SlackFile = Get-FirstFileName -Filter 'Slack*.msix*' -Fallback 'Slack.msix'
+$AutoHotkeyFile = Get-FirstFileNameFromFilters `
+    -Filters @('AutoHotkey_2*_setup.exe', 'AutoHotkey*v2*setup*.exe', 'AutoHotkey*setup*.exe') `
+    -Fallback 'AutoHotkey_2.0.26_setup.exe'
 $NvidiaDriverFile = Get-FirstFileNameFromFilters `
     -Filters @('NVIDIA-Driver*.exe', '*-desktop-win10-win11-64bit-*-dch-whql.exe') `
     -Fallback 'NVIDIA-Driver.exe'
@@ -27,7 +30,7 @@ $Apps = @(
         IncludeInSelectAll = $false
     },
     @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true; ManualInstall = $true },
-    @{ Name = 'AutoHotkey v2'; Type = 'EXE'; File = 'AutoHotkey_2.0.26_setup.exe'; Args = '/silent /Elevate'; DownloadAvailable = $true; InstalledTest = { Test-AutoHotkeyV2Installed } },
+    @{ Name = 'AutoHotkey v2'; Type = 'EXE'; File = $AutoHotkeyFile; Args = '/silent /Elevate'; DownloadAvailable = $true; InstalledTest = { Test-AutoHotkeyV2Installed } },
     @{ Name = 'GCPW (Google Credential)'; CheckPath = "$env:ProgramFiles\Google\Credential Provider"; Type = 'EXE'; File = 'gcpwstandaloneenterprise64.exe'; Args = '/silent'; DownloadAvailable = $true },
     @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true },
     @{

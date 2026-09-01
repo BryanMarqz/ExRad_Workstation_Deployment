@@ -57,7 +57,7 @@ Place these files in `Installers` after cloning or downloading the repository:
 | Slack | `Slack*.msix` |
 | NinjaOne | `NinjaOne-Agent*-Auto-*.msi` |
 | RamSoft App Launcher | `RamSoftLauncherSetup.exe` |
-| AutoHotkey v2 | `AutoHotkey_2.0.26_setup.exe` |
+| AutoHotkey v2 | `AutoHotkey_2*_setup.exe` or another `AutoHotkey*setup*.exe` filename |
 | Google Credential Provider for Windows | `gcpwstandaloneenterprise64.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
 | NVIDIA graphics driver | `NVIDIA-Driver*.exe` or `*-desktop-win10-win11-64bit-*-dch-whql.exe` |
