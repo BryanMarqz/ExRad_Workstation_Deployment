@@ -28,6 +28,7 @@ $DoneMark = [char]0x2713
 $scriptFiles = @(
     'InstallerEngine.ps1',
     'Wallpaper.ps1',
+    'DarkMode.ps1',
     'WindowsSupport.ps1',
     'Tartarus.ps1',
     'ChromePolicies.ps1',

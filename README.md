@@ -29,6 +29,7 @@ ExRad_Workstation_Deployment/
 |-- Scripts/                  Modular deployment components
 |   |-- AppCatalog.ps1        Application definitions
 |   |-- ChromePolicies.ps1    Managed Chrome bookmarks
+|   |-- DarkMode.ps1          Current and new-user dark mode
 |   |-- DeploymentUI.ps1      Preflight window and workflow
 |   |-- InstallerEngine.ps1   Detection and installation logic
 |   |-- Tartarus.ps1          Synapse profile preparation
@@ -82,7 +83,7 @@ AutoHotkey v2 actions:
 4. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
    `Scripts\ChromePolicies.ps1`.
 5. Double-click `START-EXRAD-DEPLOYMENT.bat` and approve the Administrator prompt.
-6. Select the applications, wallpaper, and optional Tartarus profile
+6. Select the applications, wallpaper, dark mode, and optional Tartarus profile
    preparation.
 7. Click **Start Installation**.
 
@@ -121,6 +122,9 @@ when necessary. Razer Synapse uses its interactive installer.
   installed separately after imaging without cloning an existing device
   identity.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
+- Windows dark mode is enabled by default for both apps and system surfaces. It
+  is applied to the current user and seeded into the Default User profile so
+  newly created Windows users inherit it.
 - The included image in `Branding` is copied to
   `C:\ProgramData\ExpertRadiology\Branding`, applied immediately to the current
   desktop, seeded for new Windows profiles, and configured as the managed

@@ -1,6 +1,6 @@
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Automated Workstation Deployment - Preflight'
-$form.Size = New-Object System.Drawing.Size(720, 580)
+$form.Size = New-Object System.Drawing.Size(720, 610)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
@@ -132,6 +132,32 @@ $form.Controls.Add($applyWallpaperCB)
 $form.Controls.Add($wallpaperStatus)
 $yPos += 28
 
+$applyDarkModeCB = New-Object System.Windows.Forms.CheckBox
+$applyDarkModeCB.Text = 'Apply Windows dark mode'
+$applyDarkModeCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$applyDarkModeCB.Size = New-Object System.Drawing.Size(320, 25)
+$applyDarkModeCB.Location = New-Object System.Drawing.Point(25, $yPos)
+
+$darkModeStatus = New-Object System.Windows.Forms.Label
+$darkModeStatus.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$darkModeStatus.Size = New-Object System.Drawing.Size(315, 25)
+$darkModeStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
+
+$darkModeAlreadyConfigured = Test-ExRadDarkModeConfigured
+if ($darkModeAlreadyConfigured) {
+    $applyDarkModeCB.Checked = $false
+    $darkModeStatus.Text = 'Already configured'
+    $darkModeStatus.ForeColor = [System.Drawing.Color]::Green
+}
+else {
+    $applyDarkModeCB.Checked = $true
+    $darkModeStatus.Text = 'Dark mode ready'
+    $darkModeStatus.ForeColor = [System.Drawing.Color]::DarkGreen
+}
+$form.Controls.Add($applyDarkModeCB)
+$form.Controls.Add($darkModeStatus)
+$yPos += 28
+
 $applyWindowsSupportCB = New-Object System.Windows.Forms.CheckBox
 $applyWindowsSupportCB.Text = 'Apply ExRad Windows support information'
 $applyWindowsSupportCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
@@ -165,6 +191,8 @@ $selectAllCB.Add_CheckedChanged({
     $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyPrepared
     $applyWallpaperCB.Checked = $selectAllCB.Checked -and `
         $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
+    $applyDarkModeCB.Checked = $selectAllCB.Checked -and `
+        -not $darkModeAlreadyConfigured
     $applyWindowsSupportCB.Checked = $selectAllCB.Checked -and `
         -not $windowsSupportAlreadyConfigured
 })
@@ -188,6 +216,7 @@ $btnStart.Add_Click({
     $selectAllCB.Enabled = $false
     $copyTartarusCB.Enabled = $false
     $applyWallpaperCB.Enabled = $false
+    $applyDarkModeCB.Enabled = $false
     $applyWindowsSupportCB.Enabled = $false
     $failures = New-Object System.Collections.Generic.List[string]
 
@@ -255,6 +284,23 @@ $btnStart.Add_Click({
         }
     }
 
+    if ($applyDarkModeCB.Checked) {
+        try {
+            $darkModeStatus.Text = 'Applying...'
+            $darkModeStatus.ForeColor = [System.Drawing.Color]::DarkBlue
+            $statusText.Text = 'Applying Windows dark mode...'
+            [System.Windows.Forms.Application]::DoEvents()
+            Set-ExRadDarkMode
+            $darkModeStatus.Text = "[$DoneMark Done] Applied"
+            $darkModeStatus.ForeColor = [System.Drawing.Color]::Green
+        }
+        catch {
+            $darkModeStatus.Text = 'Failed'
+            $darkModeStatus.ForeColor = [System.Drawing.Color]::Red
+            $failures.Add("Windows dark mode: $($_.Exception.Message)")
+        }
+    }
+
     if ($applyWindowsSupportCB.Checked) {
         try {
             $windowsSupportStatus.Text = 'Applying...'
@@ -313,6 +359,7 @@ $btnStart.Add_Click({
         $btnStart.Enabled = $true
         $copyTartarusCB.Enabled = $true
         $applyWallpaperCB.Enabled = $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
+        $applyDarkModeCB.Enabled = -not $darkModeAlreadyConfigured
         $applyWindowsSupportCB.Enabled = -not $windowsSupportAlreadyConfigured
     }
 })
