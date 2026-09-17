@@ -10,8 +10,7 @@ Installer binaries are intentionally excluded from GitHub.
 | Slack | `Slack*.msix` |
 | NinjaOne | `NinjaOne-Agent*-Auto-*.msi` |
 | RamSoft App Launcher | `RamSoftLauncherSetup.exe` |
-| AutoHotkey v2 | `AutoHotkey_2*_setup.exe` or another `AutoHotkey*setup*.exe` filename |
-| Google Credential Provider | `gcpwstandaloneenterprise64.exe` |
+| AutoHotkey v2 | `AutoHotkey_2*_setup.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
 | NVIDIA graphics driver | `NVIDIA-Driver*.exe` or the original NVIDIA filename |
 | AMD graphics driver | `AMD-Driver*.exe` or the original AMD filename |

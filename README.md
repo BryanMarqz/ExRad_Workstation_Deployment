@@ -13,10 +13,10 @@ deployment starts: **Installed**, **Installer ready**, **Installer missing**,
 
 This public repository intentionally contains **no installer binaries** and no
 enrollment tokens. In particular, do not commit a generated NinjaOne installer
-or `set_gcpw_token.reg`: both contain organization enrollment information.
+because it contains organization enrollment information.
 
 Download all installers from their official vendor portals and verify their
-digital signatures before use.
+digital signatures or published SHA256 checksums before use.
 
 ## Folder layout
 
@@ -25,15 +25,13 @@ ExRad_Workstation_Deployment/
 |-- Branding/                 ExRad wallpaper
 |-- Config/                   Non-secret deployment configuration
 |-- Installers/               Local MSI, MSIX, and EXE packages
-|-- Private/                  Ignored enrollment inputs
+|-- Private/                  Ignored NinjaOne enrollment input
 |-- Scripts/                  Modular deployment components
 |   |-- AppCatalog.ps1        Application definitions
 |   |-- ChromePolicies.ps1    Managed Chrome bookmarks
 |   |-- DeploymentUI.ps1      Preflight window and workflow
-|   |-- Gcpw.ps1              GCPW enrollment
 |   |-- InstallerEngine.ps1   Detection and installation logic
 |   |-- Tartarus.ps1          Synapse profile preparation
-|   |-- UnattendedImage.ps1   Audit Mode and Sysprep image workflow
 |   |-- Wallpaper.ps1         Desktop and lock-screen branding
 |   `-- WindowsSupport.ps1    Windows support-provider information
 |-- Tartarus_Keybindings/     Synapse profile and AHK actions
@@ -57,8 +55,7 @@ Place these files in `Installers` after cloning or downloading the repository:
 | Slack | `Slack*.msix` |
 | NinjaOne | `NinjaOne-Agent*-Auto-*.msi` |
 | RamSoft App Launcher | `RamSoftLauncherSetup.exe` |
-| AutoHotkey v2 | `AutoHotkey_2*_setup.exe` or another `AutoHotkey*setup*.exe` filename |
-| Google Credential Provider for Windows | `gcpwstandaloneenterprise64.exe` |
+| AutoHotkey v2 | `AutoHotkey_2*_setup.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
 | NVIDIA graphics driver | `NVIDIA-Driver*.exe` or `*-desktop-win10-win11-64bit-*-dch-whql.exe` |
 | AMD graphics driver (optional) | `AMD-Driver*.exe` or `*amd-software-adrenalin-edition-*.exe` |
@@ -73,59 +70,21 @@ AutoHotkey v2 actions:
 - `Play.ahk`
 - `Record.ahk`
 
-Optionally place `set_gcpw_token.reg` in `Private`. The preflight screen
-will offer **Apply GCPW enrollment token**. The script reads only the
-`EnrollmentToken` value for the approved Google CloudManagement policy key,
-writes that value after installation, and verifies it without displaying it.
-The file is ignored by Git and must remain private. Restart Windows after the
-token is applied and before the first GCPW sign-in.
-
 ## Run
 
 1. Create `Private\ninjaone-url.txt` and paste the generated NinjaOne
    Auto-installer URL into it. This ignored file must never be committed.
 2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
-   local NinjaOne package, then verifies signatures or the published hash.
-3. If GCPW enrollment is needed, add `Private\set_gcpw_token.reg`.
-4. Add `RamSoftLauncherSetup.exe` to `Installers` manually because it is
+   local NinjaOne package, then verifies their digital signatures or published
+   SHA256 checksums.
+3. Add `RamSoftLauncherSetup.exe` to `Installers` manually because it is
    customer-specific.
-5. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
+4. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
    `Scripts\ChromePolicies.ps1`.
-6. Double-click `START-EXRAD-DEPLOYMENT.bat` and approve the Administrator prompt.
-7. Select the applications, GCPW token, wallpaper, and optional Tartarus profile
+5. Double-click `START-EXRAD-DEPLOYMENT.bat` and approve the Administrator prompt.
+6. Select the applications, wallpaper, and optional Tartarus profile
    preparation.
-8. Click **Start Installation**.
-
-## Optional generalized image workflow
-
-On a reference PC, enter Windows Audit Mode, run the deployment, and manually
-enable **Generalize image after deployment (Sysprep + shutdown)**. This option is
-disabled outside Audit Mode and is never selected by **Select All**.
-
-NinjaOne is also off by default and excluded from **Select All**. For a golden
-image, install NinjaOne after applying the image so each workstation registers
-with its own device identity. If NinjaOne must be captured in the image, follow
-NinjaOne's vendor-supported `noclone` preparation procedure before capture.
-
-After the normal deployment finishes successfully, the script:
-
-1. Prompts twice for a password of at least 12 characters for the local `Admin`
-   account. The password is never saved in the repository.
-2. Generates a temporary Windows answer file from
-   `Config\Unattend-OOBE-Template.xml`.
-3. Adds pre-login `SetupComplete.cmd` cleanup, with first-login cleanup as a
-   fallback, to remove cached answer files containing the reversible password
-   value.
-4. Requests final confirmation, then runs `Sysprep /generalize /oobe /shutdown`.
-5. Shuts down the reference PC so the generalized Windows volume can be captured
-   offline with the organization's imaging tool.
-
-The answer file creates a local `Admin` account without auto-logon and automates
-the supported Windows 11 OOBE pages, so a deployed workstation should stop at
-the Windows login screen. Microsoft warns against using `SkipMachineOOBE`, so
-the template intentionally omits both legacy `SkipMachineOOBE` and
-`SkipUserOOBE`. Unattend-created local accounts do not require interactive
-security-question answers.
+7. Click **Start Installation**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1
@@ -154,7 +113,13 @@ when necessary. Razer Synapse uses its interactive installer.
   completion message. Importing the prepared profile applies all mappings; the
   technician does not recreate them individually.
 - AutoHotkey v2 detection checks system-wide and per-user installation paths,
-  uninstall registry records, and executables available on `PATH`.
+  uninstall registry records, and executables available on `PATH`. Installer
+  discovery accepts any `AutoHotkey_2*_setup.exe` version and chooses the
+  highest version when more than one is present. The downloader resolves the
+  current AutoHotkey v2 release instead of pinning a version number.
+- NinjaOne is off by default and excluded from **Select All** so it can be
+  installed separately after imaging without cloning an existing device
+  identity.
 - Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
 - The included image in `Branding` is copied to
   `C:\ProgramData\ExpertRadiology\Branding`, applied immediately to the current

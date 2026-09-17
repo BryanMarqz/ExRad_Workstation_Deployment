@@ -69,31 +69,44 @@ function Get-SignedInstaller {
     }
 }
 
-function Get-HashedInstaller {
-    param(
-        [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][string]$Uri,
-        [Parameter(Mandatory = $true)][string]$FileName,
-        [Parameter(Mandatory = $true)][string]$Sha256
-    )
+function Get-LatestAutoHotkeyInstaller {
+    $versionUri = 'https://www.autohotkey.com/download/2.0/version.txt'
+    $version = (Invoke-WebRequest -Uri $versionUri -UseBasicParsing).Content.Trim()
+    if ($version -notmatch '^2(?:\.\d+)+$') {
+        throw "AutoHotkey returned an unexpected v2 version value: '$version'."
+    }
 
-    Move-LegacyInstaller -FileName $FileName
-    $destination = Join-Path $DestinationRoot $FileName
+    $fileName = "AutoHotkey_${version}_setup.exe"
+    $downloadUri = "https://www.autohotkey.com/download/2.0/$fileName"
+    $checksumResponse = Invoke-WebRequest -Uri "$downloadUri.sha256" -UseBasicParsing
+    $checksumText = if ($checksumResponse.Content -is [byte[]]) {
+        [Text.Encoding]::UTF8.GetString($checksumResponse.Content)
+    }
+    else {
+        [string]$checksumResponse.Content
+    }
+    $sha256 = $checksumText.Trim()
+    if ($sha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+        throw "AutoHotkey returned an invalid SHA256 value for '$fileName'."
+    }
+
+    Move-LegacyInstaller -FileName $fileName
+    $destination = Join-Path $DestinationRoot $fileName
     if ((Test-Path -LiteralPath $destination) -and -not $Force) {
-        Write-Host "[SKIP] $Name already exists: $FileName" -ForegroundColor Yellow
+        Write-Host "[SKIP] AutoHotkey v$version already exists: $fileName" -ForegroundColor Yellow
         return
     }
 
     $partial = "$destination.download"
     try {
-        Write-Host "[DOWNLOAD] $Name" -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $Uri -OutFile $partial -UseBasicParsing -MaximumRedirection 10
+        Write-Host "[DOWNLOAD] AutoHotkey v$version" -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $downloadUri -OutFile $partial -UseBasicParsing -MaximumRedirection 10
         $actualHash = (Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash
-        if ($actualHash -ne $Sha256) {
-            throw "SHA256 validation failed for '$FileName'."
+        if ($actualHash -ne $sha256) {
+            throw "SHA256 validation failed for '$fileName'."
         }
         Move-Item -LiteralPath $partial -Destination $destination -Force
-        Write-Host "[OK] $FileName" -ForegroundColor Green
+        Write-Host "[OK] $fileName" -ForegroundColor Green
     }
     finally {
         if (Test-Path -LiteralPath $partial) {
@@ -122,12 +135,6 @@ $downloads = @(
         Publisher = 'CN="Slack Technologies, LLC"'
     },
     @{
-        Name = 'Google Credential Provider for Windows'
-        Uri = 'https://dl.google.com/credentialprovider/gcpwstandaloneenterprise64.exe'
-        FileName = 'gcpwstandaloneenterprise64.exe'
-        Publisher = 'CN=Google LLC'
-    },
-    @{
         Name = 'Razer Synapse'
         Uri = 'https://rzr.to/synapse-4-pc-download'
         FileName = 'RazerSynapseInstaller.exe'
@@ -146,11 +153,7 @@ foreach ($download in $downloads) {
 }
 
 try {
-    Get-HashedInstaller `
-        -Name 'AutoHotkey v2.0.26' `
-        -Uri 'https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.26/AutoHotkey_2.0.26_setup.exe' `
-        -FileName 'AutoHotkey_2.0.26_setup.exe' `
-        -Sha256 '2BF1B89B1047136490FC321D2FDC988B42DD86F693EEA7872746AC6ADF722BC3'
+    Get-LatestAutoHotkeyInstaller
 }
 catch {
     Write-Warning "AutoHotkey: $($_.Exception.Message)"

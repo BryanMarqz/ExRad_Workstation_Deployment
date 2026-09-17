@@ -34,6 +34,40 @@ function Get-FirstFileNameFromFilters {
     return $Fallback
 }
 
+function Get-NewestVersionedFileName {
+    param(
+        [Parameter(Mandatory = $true)][string]$Filter,
+        [Parameter(Mandatory = $true)][string]$VersionPattern,
+        [Parameter(Mandatory = $true)][string]$Fallback
+    )
+
+    foreach ($searchRoot in $InstallerSearchRoots) {
+        if (-not (Test-Path -LiteralPath $searchRoot)) { continue }
+
+        $versionedFiles = foreach ($file in Get-ChildItem -LiteralPath $searchRoot -Filter $Filter -File) {
+            $match = [regex]::Match(
+                $file.Name,
+                $VersionPattern,
+                [Text.RegularExpressions.RegexOptions]::IgnoreCase
+            )
+            if (-not $match.Success) { continue }
+
+            try {
+                [pscustomobject]@{
+                    Name = $file.Name
+                    Version = [version]$match.Groups['Version'].Value
+                }
+            }
+            catch { continue }
+        }
+
+        $newest = $versionedFiles | Sort-Object Version -Descending | Select-Object -First 1
+        if ($null -ne $newest) { return $newest.Name }
+    }
+
+    return $Fallback
+}
+
 function Resolve-InstallerPath {
     param([Parameter(Mandatory = $true)][string]$FileName)
 
