@@ -31,7 +31,16 @@ $Apps = @(
         IncludeInSelectAll = $false
     },
     @{ Name = 'RamSoft Client'; CheckPath = "${env:ProgramFiles(x86)}\RamSoft\Apps\rsapplauncher.exe"; Type = 'EXE'; File = 'RamSoftLauncherSetup.exe'; Args = '/S /v"/qn /norestart"'; InteractiveFallback = $true; ManualInstall = $true },
-    @{ Name = 'AutoHotkey v2'; Type = 'EXE'; File = $AutoHotkeyFile; Args = '/silent /Elevate'; DownloadAvailable = $true; InstalledTest = { Test-AutoHotkeyV2Installed } },
+    @{
+        Name = 'AutoHotkey v2'
+        Type = 'EXE'
+        File = $AutoHotkeyFile
+        Args = '/silent /Elevate'
+        DownloadAvailable = $true
+        InstalledTest = { Test-AutoHotkeyV2Installed }
+        DefaultSelected = $false
+        IncludeInSelectAll = $false
+    },
     @{ Name = 'Razer Synapse'; CheckPath = "$env:ProgramFiles\Razer\RazerAppEngine\RazerAppEngine.exe"; Type = 'EXE'; File = 'RazerSynapseInstaller.exe'; Args = ''; DownloadAvailable = $true; ManualInstall = $true },
     @{
         Name = 'NVIDIA Graphics Driver'

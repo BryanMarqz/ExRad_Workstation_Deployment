@@ -29,12 +29,12 @@ ExRad_Workstation_Deployment/
 |-- Scripts/                  Modular deployment components
 |   |-- AppCatalog.ps1        Application definitions
 |   |-- ChromePolicies.ps1    Managed Chrome bookmarks
+|   |-- Cleanup.ps1           Removes retired deployment settings
 |   |-- DarkMode.ps1          Current and new-user dark mode
 |   |-- DeploymentUI.ps1      Preflight window and workflow
 |   |-- InstallerEngine.ps1   Detection and installation logic
 |   |-- Tartarus.ps1          Synapse profile preparation
-|   |-- Wallpaper.ps1         Desktop and lock-screen branding
-|   `-- WindowsSupport.ps1    Windows support-provider information
+|   `-- Wallpaper.ps1         Desktop and lock-screen branding
 |-- Tartarus_Keybindings/     Synapse profile and AHK actions
 |-- Download-Installers.ps1   Verified installer downloader
 |-- START-EXRAD-DEPLOYMENT.bat  Double-click this to begin
@@ -117,11 +117,12 @@ when necessary. Razer Synapse uses its interactive installer.
   uninstall registry records, and executables available on `PATH`. Installer
   discovery accepts any `AutoHotkey_2*_setup.exe` version and chooses the
   highest version when more than one is present. The downloader resolves the
-  current AutoHotkey v2 release instead of pinning a version number.
+  current AutoHotkey v2 release instead of pinning a version number. AutoHotkey
+  is opt-in and excluded from **Select All**.
 - NinjaOne is off by default and excluded from **Select All** so it can be
   installed separately after imaging without cloning an existing device
   identity.
-- Chrome receives managed bookmarks for RamSoft, Zetta Health, and Gmail.
+- Chrome receives managed bookmarks for RamSoft, RADAware, RADWorx, and Gmail.
 - Windows dark mode is enabled by default for both apps and system surfaces. It
   is applied to the current user and seeded into the Default User profile so
   newly created Windows users inherit it.
@@ -131,12 +132,9 @@ when necessary. Razer Synapse uses its interactive installer.
   lock/sign-in image. Windows 11 Enterprise and Education honor the managed
   lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
   editions.
-- Windows website information is configured under the standard OEM information
-  key. Windows displays
-  `support@expertradiology.com | expertradiology.com` as the provider link and
-  opens `https://expertradiology.com` when it is selected. The
-  exact placement varies by Windows 11 build; Windows does not offer a separate
-  modern OEM email field.
+- The deployment removes legacy Expert Radiology OEM support values because
+  Windows 11 cannot present separate custom support-email and website fields in
+  the requested layout.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
   package for the exact GPU, computer manufacturer, and Windows version.
 - NVIDIA uses display-driver-only silent installation and is selected only when

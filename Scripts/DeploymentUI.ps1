@@ -1,6 +1,6 @@
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Automated Workstation Deployment - Preflight'
-$form.Size = New-Object System.Drawing.Size(720, 610)
+$form.Size = New-Object System.Drawing.Size(720, 580)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
@@ -158,32 +158,6 @@ $form.Controls.Add($applyDarkModeCB)
 $form.Controls.Add($darkModeStatus)
 $yPos += 28
 
-$applyWindowsSupportCB = New-Object System.Windows.Forms.CheckBox
-$applyWindowsSupportCB.Text = 'Apply ExRad Windows support information'
-$applyWindowsSupportCB.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-$applyWindowsSupportCB.Size = New-Object System.Drawing.Size(320, 25)
-$applyWindowsSupportCB.Location = New-Object System.Drawing.Point(25, $yPos)
-
-$windowsSupportStatus = New-Object System.Windows.Forms.Label
-$windowsSupportStatus.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-$windowsSupportStatus.Size = New-Object System.Drawing.Size(315, 25)
-$windowsSupportStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
-
-$windowsSupportAlreadyConfigured = Test-ExRadWindowsSupportConfigured
-if ($windowsSupportAlreadyConfigured) {
-    $applyWindowsSupportCB.Checked = $false
-    $windowsSupportStatus.Text = 'Already configured'
-    $windowsSupportStatus.ForeColor = [System.Drawing.Color]::Green
-}
-else {
-    $applyWindowsSupportCB.Checked = $true
-    $windowsSupportStatus.Text = 'Support details ready'
-    $windowsSupportStatus.ForeColor = [System.Drawing.Color]::DarkGreen
-}
-$form.Controls.Add($applyWindowsSupportCB)
-$form.Controls.Add($windowsSupportStatus)
-$yPos += 28
-
 $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
         $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
@@ -193,8 +167,6 @@ $selectAllCB.Add_CheckedChanged({
         $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
     $applyDarkModeCB.Checked = $selectAllCB.Checked -and `
         -not $darkModeAlreadyConfigured
-    $applyWindowsSupportCB.Checked = $selectAllCB.Checked -and `
-        -not $windowsSupportAlreadyConfigured
 })
 
 $statusText = New-Object System.Windows.Forms.Label
@@ -217,7 +189,6 @@ $btnStart.Add_Click({
     $copyTartarusCB.Enabled = $false
     $applyWallpaperCB.Enabled = $false
     $applyDarkModeCB.Enabled = $false
-    $applyWindowsSupportCB.Enabled = $false
     $failures = New-Object System.Collections.Generic.List[string]
 
     foreach ($app in $Apps) {
@@ -301,21 +272,13 @@ $btnStart.Add_Click({
         }
     }
 
-    if ($applyWindowsSupportCB.Checked) {
-        try {
-            $windowsSupportStatus.Text = 'Applying...'
-            $windowsSupportStatus.ForeColor = [System.Drawing.Color]::DarkBlue
-            $statusText.Text = 'Applying Windows support information...'
-            [System.Windows.Forms.Application]::DoEvents()
-            Set-ExRadWindowsSupport
-            $windowsSupportStatus.Text = "[$DoneMark Done] Applied"
-            $windowsSupportStatus.ForeColor = [System.Drawing.Color]::Green
-        }
-        catch {
-            $windowsSupportStatus.Text = 'Failed'
-            $windowsSupportStatus.ForeColor = [System.Drawing.Color]::Red
-            $failures.Add("Windows support information: $($_.Exception.Message)")
-        }
+    try {
+        $statusText.Text = 'Removing legacy Windows support information...'
+        [System.Windows.Forms.Application]::DoEvents()
+        Remove-LegacyExRadWindowsSupport
+    }
+    catch {
+        $failures.Add("Legacy Windows support cleanup: $($_.Exception.Message)")
     }
 
     try {
@@ -360,7 +323,6 @@ $btnStart.Add_Click({
         $copyTartarusCB.Enabled = $true
         $applyWallpaperCB.Enabled = $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
         $applyDarkModeCB.Enabled = -not $darkModeAlreadyConfigured
-        $applyWindowsSupportCB.Enabled = -not $windowsSupportAlreadyConfigured
     }
 })
 
