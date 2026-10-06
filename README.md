@@ -3,7 +3,8 @@
 PowerShell-based Windows workstation deployment utility with a graphical app
 selector. It installs locally supplied software packages, copies optional Razer
 Tartarus keybindings, applies ExRad desktop and lock/sign-in branding, and
-configures managed Chrome bookmarks.
+configures managed Chrome bookmarks. It also configures the Windows About page
+with **Expert Radiology**, **(415) 900-2000**, and the Expert Radiology website.
 
 The preflight view shows the current state of every application before the
 deployment starts: **Installed**, **Installer ready**, **Installer missing**,
@@ -29,7 +30,7 @@ ExRad_Workstation_Deployment/
 |-- Scripts/                  Modular deployment components
 |   |-- AppCatalog.ps1        Application definitions
 |   |-- ChromePolicies.ps1    Managed Chrome bookmarks
-|   |-- Cleanup.ps1           Removes retired deployment settings
+|   |-- Cleanup.ps1           Sets Windows OEM support information and removes retired values
 |   |-- DarkMode.ps1          Current and new-user dark mode
 |   |-- DeploymentUI.ps1      Preflight window and workflow
 |   |-- InstallerEngine.ps1   Detection and installation logic
@@ -132,9 +133,10 @@ when necessary. Razer Synapse uses its interactive installer.
   lock/sign-in image. Windows 11 Enterprise and Education honor the managed
   lock/sign-in policy most consistently; behavior can vary on unmanaged Pro
   editions.
-- The deployment removes legacy Expert Radiology OEM support values because
-  Windows 11 cannot present separate custom support-email and website fields in
-  the requested layout.
+- Windows OEM support information is configured with manufacturer **Expert
+  Radiology**, phone **(415) 900-2000**, and online support URL
+  **https://www.expertradiology.com/**. Windows controls the labels and their
+  display order in the About page.
 - Graphics-driver packages are not downloaded automatically. Supply the correct
   package for the exact GPU, computer manufacturer, and Windows version.
 - NVIDIA uses display-driver-only silent installation and is selected only when

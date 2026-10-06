@@ -273,12 +273,12 @@ $btnStart.Add_Click({
     }
 
     try {
-        $statusText.Text = 'Removing legacy Windows support information...'
+        $statusText.Text = 'Setting Windows support information...'
         [System.Windows.Forms.Application]::DoEvents()
-        Remove-LegacyExRadWindowsSupport
+        Set-ExRadWindowsSupportInformation
     }
     catch {
-        $failures.Add("Legacy Windows support cleanup: $($_.Exception.Message)")
+        $failures.Add("Windows support information: $($_.Exception.Message)")
     }
 
     try {
