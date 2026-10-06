@@ -68,9 +68,12 @@ folder.
 `Tartarus_Keybindings` contains the exported Synapse profile and its optional
 AutoHotkey v2 actions:
 
-- `Default-Profile.synapse4`
-- `Play.ahk`
+- `Expert_Radiology.synapse4`
+- `Fast_Foward.ahk`
+- `Play_Pause.ahk`
 - `Record.ahk`
+- `Rewind.ahk`
+- `Stop.ahk`
 
 ## Run
 
