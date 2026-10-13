@@ -79,39 +79,6 @@ function Resolve-InstallerPath {
     return Join-Path $InstallerDir $FileName
 }
 
-function Get-DisplayDriverRecords {
-    try {
-        return @(Get-CimInstance -ClassName Win32_PnPSignedDriver `
-            -Filter "DeviceClass='DISPLAY'" -ErrorAction Stop)
-    }
-    catch {
-        return @()
-    }
-}
-
-function Test-DisplayHardwarePresent {
-    param([Parameter(Mandatory = $true)][string]$VendorId)
-
-    return $null -ne (Get-DisplayDriverRecords |
-        Where-Object { $_.DeviceID -match $VendorId } |
-        Select-Object -First 1)
-}
-
-function Test-DisplayDriverInstalled {
-    param(
-        [Parameter(Mandatory = $true)][string]$VendorId,
-        [Parameter(Mandatory = $true)][string]$ProviderPattern
-    )
-
-    return $null -ne (Get-DisplayDriverRecords |
-        Where-Object {
-            $_.DeviceID -match $VendorId -and
-            $_.DriverProviderName -match $ProviderPattern -and
-            -not [string]::IsNullOrWhiteSpace($_.DriverVersion)
-        } |
-        Select-Object -First 1)
-}
-
 function Test-AppInstalled {
     param([Parameter(Mandatory = $true)][hashtable]$App)
 
@@ -119,15 +86,6 @@ function Test-AppInstalled {
         return [bool](& $App.InstalledTest)
     }
     return Test-Path -Path $App.CheckPath
-}
-
-function Test-AppHardwarePresent {
-    param([Parameter(Mandatory = $true)][hashtable]$App)
-
-    if ($App.HardwareTest) {
-        return [bool](& $App.HardwareTest)
-    }
-    return $true
 }
 
 function Test-AutoHotkeyV2Installed {
@@ -172,9 +130,6 @@ function Test-AutoHotkeyV2Installed {
 function Get-PreflightStatus {
     param([Parameter(Mandatory = $true)][hashtable]$App)
 
-    if (-not (Test-AppHardwarePresent -App $App)) {
-        return @{ Text = 'GPU not detected'; Color = [System.Drawing.Color]::Gray; Installed = $false; Selectable = $false }
-    }
     if (Test-AppInstalled -App $App) {
         return @{ Text = 'Installed'; Color = [System.Drawing.Color]::Green; Installed = $true }
     }

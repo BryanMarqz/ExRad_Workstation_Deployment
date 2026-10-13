@@ -30,7 +30,6 @@ $form.Controls.Add($statusHeader)
 $checkBoxes = @{}
 $preflightLabels = @{}
 $selectAllEligibleApps = @{}
-$appToolTip = New-Object System.Windows.Forms.ToolTip
 $yPos = 75
 
 foreach ($app in $Apps) {
@@ -58,13 +57,6 @@ foreach ($app in $Apps) {
         $cb.Checked = $defaultSelected
     }
 
-    if (-not [string]::IsNullOrWhiteSpace([string]$app.DisplayNote)) {
-        $cb.Text = "$($app.Name) ($($app.DisplayNote))"
-    }
-    if (-not [string]::IsNullOrWhiteSpace([string]$app.HelpText)) {
-        $appToolTip.SetToolTip($cb, [string]$app.HelpText)
-    }
-
     $cb.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
     $cb.Size = New-Object System.Drawing.Size(320, 25)
     $cb.Location = New-Object System.Drawing.Point(25, $yPos)
@@ -87,7 +79,7 @@ $tartarusAlreadyPrepared = Test-TartarusProfilePrepared
 if ($tartarusAlreadyPrepared) {
     $copyTartarusCB.Text = 'Refresh Tartarus profile for Synapse import (Already Staged)'
     $copyTartarusCB.ForeColor = [System.Drawing.Color]::Gray
-    $copyTartarusCB.Checked = $false
+    $copyTartarusCB.Checked = $true
 }
 else {
     $copyTartarusCB.Text = 'Prepare Tartarus profile for Synapse import'
@@ -113,7 +105,7 @@ $wallpaperStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
 $wallpaperAlreadyConfigured = Test-ExRadWallpaperConfigured
 $wallpaperSourceExists = Test-Path -LiteralPath $WallpaperSource
 if ($wallpaperAlreadyConfigured) {
-    $applyWallpaperCB.Checked = $false
+    $applyWallpaperCB.Checked = $true
     $wallpaperStatus.Text = 'Already configured'
     $wallpaperStatus.ForeColor = [System.Drawing.Color]::Green
 }
@@ -145,7 +137,7 @@ $darkModeStatus.Location = New-Object System.Drawing.Point(360, ($yPos + 3))
 
 $darkModeAlreadyConfigured = Test-ExRadDarkModeConfigured
 if ($darkModeAlreadyConfigured) {
-    $applyDarkModeCB.Checked = $false
+    $applyDarkModeCB.Checked = $true
     $darkModeStatus.Text = 'Already configured'
     $darkModeStatus.ForeColor = [System.Drawing.Color]::Green
 }
@@ -162,11 +154,10 @@ $selectAllCB.Add_CheckedChanged({
     foreach ($app in $Apps) {
         $checkBoxes[$app.Name].Checked = $selectAllCB.Checked -and $selectAllEligibleApps[$app.Name]
     }
-    $copyTartarusCB.Checked = $selectAllCB.Checked -and -not $tartarusAlreadyPrepared
+    $copyTartarusCB.Checked = $selectAllCB.Checked
     $applyWallpaperCB.Checked = $selectAllCB.Checked -and `
-        $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
-    $applyDarkModeCB.Checked = $selectAllCB.Checked -and `
-        -not $darkModeAlreadyConfigured
+        $wallpaperSourceExists
+    $applyDarkModeCB.Checked = $selectAllCB.Checked
 })
 
 $statusText = New-Object System.Windows.Forms.Label
@@ -321,8 +312,8 @@ $btnStart.Add_Click({
         ) | Out-Null
         $btnStart.Enabled = $true
         $copyTartarusCB.Enabled = $true
-        $applyWallpaperCB.Enabled = $wallpaperSourceExists -and -not $wallpaperAlreadyConfigured
-        $applyDarkModeCB.Enabled = -not $darkModeAlreadyConfigured
+        $applyWallpaperCB.Enabled = $wallpaperSourceExists
+        $applyDarkModeCB.Enabled = $true
     }
 })
 

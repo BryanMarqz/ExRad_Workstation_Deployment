@@ -10,7 +10,7 @@
 # Archives and generated files
 *.zip
 *.log
-Tartarus_Keybindings/*.exe
+Deployment/Tartarus_Keybindings/*.exe
 
 # Local backups and alternate drafts
 *.bak

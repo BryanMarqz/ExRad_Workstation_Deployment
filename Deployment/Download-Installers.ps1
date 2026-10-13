@@ -1,15 +1,12 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [switch]$Force,
-    [string]$NinjaOneUrl
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
 $DestinationRoot = Join-Path $PSScriptRoot 'Installers'
-$PrivateRoot = Join-Path $PSScriptRoot 'Private'
 New-Item -ItemType Directory -Path $DestinationRoot -Force | Out-Null
-New-Item -ItemType Directory -Path $PrivateRoot -Force | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Move-LegacyInstaller {
@@ -157,41 +154,6 @@ try {
 }
 catch {
     Write-Warning "AutoHotkey: $($_.Exception.Message)"
-}
-
-if ([string]::IsNullOrWhiteSpace($NinjaOneUrl)) {
-    $NinjaOneUrl = $env:NINJAONE_INSTALLER_URL
-}
-
-$ninjaUrlFile = Join-Path $PrivateRoot 'ninjaone-url.txt'
-if (-not (Test-Path -LiteralPath $ninjaUrlFile)) {
-    $ninjaUrlFile = Join-Path $PSScriptRoot 'ninjaone-url.txt'
-}
-if ([string]::IsNullOrWhiteSpace($NinjaOneUrl) -and (Test-Path -LiteralPath $ninjaUrlFile)) {
-    $NinjaOneUrl = (Get-Content -LiteralPath $ninjaUrlFile -Raw).Trim()
-}
-
-if ([string]::IsNullOrWhiteSpace($NinjaOneUrl)) {
-    Write-Warning 'NinjaOne skipped. Add the private installer URL to Private\ninjaone-url.txt.'
-}
-else {
-    try {
-        $ninjaUri = [uri]$NinjaOneUrl
-        if ($ninjaUri.Scheme -ne 'https' -or $ninjaUri.Host -ne 'app.ninjarmm.com') {
-            throw 'The NinjaOne URL must use HTTPS on app.ninjarmm.com.'
-        }
-
-        $ninjaFileName = [IO.Path]::GetFileName($ninjaUri.AbsolutePath)
-        if ($ninjaFileName -notmatch '^NinjaOne-Agent.*-Auto-.*\.msi$') {
-            throw 'The URL does not point to an expected NinjaOne Auto MSI.'
-        }
-
-        Get-SignedInstaller -Name 'NinjaOne Auto Agent' -Uri $NinjaOneUrl `
-            -FileName $ninjaFileName -PublisherPattern 'CN=NinjaOne LLC'
-    }
-    catch {
-        Write-Warning "NinjaOne: $($_.Exception.Message)"
-    }
 }
 
 Write-Host ''

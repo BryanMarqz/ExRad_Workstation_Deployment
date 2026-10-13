@@ -8,7 +8,7 @@ with **Expert Radiology**, **(415) 900-2000**, and the Expert Radiology website.
 
 The preflight view shows the current state of every application before the
 deployment starts: **Installed**, **Installer ready**, **Installer missing**,
-**Download required**, **Manual installation required**, or **GPU not detected**.
+**Download required**, or **Manual installation required**.
 
 ## Security
 
@@ -23,26 +23,25 @@ digital signatures or published SHA256 checksums before use.
 
 ```text
 ExRad_Workstation_Deployment/
-|-- Branding/                 ExRad wallpaper
-|-- Config/                   Non-secret deployment configuration
-|-- Installers/               Local MSI, MSIX, and EXE packages
-|-- Private/                  Ignored NinjaOne enrollment input
-|-- Scripts/                  Modular deployment components
-|   |-- AppCatalog.ps1        Application definitions
-|   |-- ChromePolicies.ps1    Managed Chrome bookmarks
-|   |-- Cleanup.ps1           Sets Windows OEM support information and removes retired values
-|   |-- DarkMode.ps1          Current and new-user dark mode
-|   |-- DeploymentUI.ps1      Preflight window and workflow
-|   |-- InstallerEngine.ps1   Detection and installation logic
-|   |-- Tartarus.ps1          Synapse profile preparation
-|   `-- Wallpaper.ps1         Desktop and lock-screen branding
-|-- Tartarus_Keybindings/     Synapse profile and AHK actions
-|-- Download-Installers.ps1   Verified installer downloader
 |-- START-EXRAD-DEPLOYMENT.bat  Double-click this to begin
-`-- setup.ps1                 Small component loader/entry point
+`-- Deployment/
+    |-- Branding/             ExRad wallpaper
+    |-- Config/               Microsoft 365 configuration
+    |-- Installers/           Local MSI, MSIX, and EXE packages
+    |-- Scripts/              Modular deployment components
+    |-- Tartarus_Keybindings/ Synapse profile and AHK actions
+    |-- Intune/
+    |   `-- RadiologistBaseline/  Standalone Intune branding script
+    |-- Download-Installers.ps1   Public installer downloader
+    |-- setup.ps1             Component loader/entry point
+    |-- README.md             Deployment instructions
+    `-- LICENSE
 ```
 
-Installer binaries inside `Installers` remain ignored by Git. For backward
+Paths below are relative to `Deployment` unless stated otherwise. Git metadata
+and `.gitignore` remain at the repository root.
+
+Installer binaries inside `Deployment\Installers` remain ignored by Git. For backward
 compatibility, `setup.ps1` also detects installers left beside the script, but
 new downloads and manually supplied packages should use `Installers`.
 
@@ -55,12 +54,10 @@ Place these files in `Installers` after cloning or downloading the repository:
 | Google Chrome Enterprise | `googlechromestandaloneenterprise64.msi` |
 | Microsoft 365 Deployment Tool | `OfficeSetup.exe` |
 | Slack | `Slack*.msix` |
-| NinjaOne | `NinjaOne-Agent*-Auto-*.msi` |
+| NinjaOne | `installer.msi` (preferred) or `NinjaOne*.msi` |
 | RamSoft App Launcher | `RamSoftLauncherSetup.exe` |
 | AutoHotkey v2 | `AutoHotkey_2*_setup.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
-| NVIDIA graphics driver | `NVIDIA-Driver*.exe` or `*-desktop-win10-win11-64bit-*-dch-whql.exe` |
-| AMD graphics driver (optional) | `AMD-Driver*.exe` or `*amd-software-adrenalin-edition-*.exe` |
 
 Installer binaries are ignored by Git and remain local to the `Installers`
 folder.
@@ -77,22 +74,22 @@ AutoHotkey v2 actions:
 
 ## Run
 
-1. Create `Private\ninjaone-url.txt` and paste the generated NinjaOne
-   Auto-installer URL into it. This ignored file must never be committed.
-2. Run `Download-Installers.ps1`. It downloads public vendor installers and the
-   local NinjaOne package, then verifies their digital signatures or published
+1. Run `Download-Installers.ps1` if you need the public vendor installers.
+   It verifies their digital signatures or published
    SHA256 checksums.
-3. Add `RamSoftLauncherSetup.exe` to `Installers` manually because it is
-   customer-specific.
-4. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
+2. Add the NinjaOne `installer.msi` and `RamSoftLauncherSetup.exe` to
+   `Installers` manually. No private URL file is needed.
+3. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
    `Scripts\ChromePolicies.ps1`.
-5. Double-click `START-EXRAD-DEPLOYMENT.bat` and approve the Administrator prompt.
-6. Select the applications, wallpaper, dark mode, and optional Tartarus profile
-   preparation.
-7. Click **Start Installation**.
+4. Double-click `START-EXRAD-DEPLOYMENT.bat` at the repository root and approve
+   the Administrator prompt.
+5. All applications needing installation, Tartarus profile preparation,
+   wallpaper, and dark mode are selected by default. Deselect any you do not need.
+6. Click **Start Installation**. Installed applications are skipped; selected
+   Tartarus and appearance settings are refreshed even if already configured.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Download-Installers.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Deployment\Download-Installers.ps1
 ```
 
 Use `-Force` to replace installers that have already been downloaded.
@@ -121,11 +118,10 @@ when necessary. Razer Synapse uses its interactive installer.
   uninstall registry records, and executables available on `PATH`. Installer
   discovery accepts any `AutoHotkey_2*_setup.exe` version and chooses the
   highest version when more than one is present. The downloader resolves the
-  current AutoHotkey v2 release instead of pinning a version number. AutoHotkey
-  is opt-in and excluded from **Select All**.
-- NinjaOne is off by default and excluded from **Select All** so it can be
-  installed separately after imaging without cloning an existing device
-  identity.
+  current AutoHotkey v2 release instead of pinning a version number.
+- NinjaOne uses a locally supplied MSI and is selected by default, along with
+  AutoHotkey and the other applications. **Select All** includes every application
+  that still needs installation. The NinjaOne MSI is not downloaded automatically.
 - Chrome receives managed bookmarks for RamSoft, RADAware, RADWorx, and Gmail.
 - Windows dark mode is enabled by default for both apps and system surfaces. It
   is applied to the current user and seeded into the Default User profile so
@@ -140,12 +136,3 @@ when necessary. Razer Synapse uses its interactive installer.
   Radiology**, phone **(415) 900-2000**, and online support URL
   **https://www.expertradiology.com/**. Windows controls the labels and their
   display order in the About page.
-- Graphics-driver packages are not downloaded automatically. Supply the correct
-  package for the exact GPU, computer manufacturer, and Windows version.
-- NVIDIA uses display-driver-only silent installation and is selected only when
-  NVIDIA hardware is detected without its vendor driver.
-- AMD is optional and excluded from **Select All**. The script does not disable
-  the AMD iGPU; it only leaves its driver installation unchecked by default.
-- AMD `minimalsetup_web` packages require internet access and technician input.
-  Full offline AMD packages use unattended mode and fall back to the interactive
-  installer if the AMD driver cannot be confirmed.
