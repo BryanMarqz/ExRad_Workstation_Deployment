@@ -41,8 +41,6 @@ ExRad_Workstation_Deployment/
     |-- Installers/           Local MSI, MSIX, and EXE packages
     |-- Scripts/              Modular deployment components
     |-- Tartarus_Keybindings/ Synapse profile and AHK actions
-    |-- Intune/
-    |   `-- RadiologistBaseline/  Standalone Intune branding script
     |-- Download-Installers.ps1   Public installer downloader
     |-- setup.ps1             Component loader/entry point
     `-- LICENSE
@@ -146,16 +144,3 @@ when necessary. Razer Synapse uses its interactive installer.
   Radiology**, phone **(415) 900-2000**, and online support URL
   **https://www.expertradiology.com/**. Windows controls the labels and their
   display order in the About page.
-
-## Standalone Intune baseline
-
-`Deployment\Intune\RadiologistBaseline\Install-Baseline.ps1` is a separate
-System-context Win32 app script for Autopilot. Package it alongside
-`wallpaper.png` and `lockscreen.png`. It copies the images to `C:\ProgramData\ER`,
-sets OEM support details, and seeds desktop wallpaper and dark mode for new
-user profiles. Detection uses the 64-bit registry value
-`HKLM\SOFTWARE\ER\Baseline\Version`, string equal to `2`.
-
-On Windows Pro, the Intune baseline copies the lock-screen image but skips
-unsupported Group Policy lock-screen enforcement. Existing user profiles are
-not modified by that standalone baseline.
