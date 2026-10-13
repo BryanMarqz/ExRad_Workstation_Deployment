@@ -10,6 +10,16 @@ The preflight view shows the current state of every application before the
 deployment starts: **Installed**, **Installer ready**, **Installer missing**,
 **Download required**, or **Manual installation required**.
 
+## Quick start
+
+Extract the complete repository, add your NinjaOne `installer.msi` and RamSoft
+installer to `Deployment\Installers`, and double-click
+**START-EXRAD-DEPLOYMENT.bat**. Download missing public installers with
+`Deployment\Download-Installers.ps1` before starting installation.
+
+All seven applications, Tartarus profile preparation, ExRad wallpaper, and dark
+mode are selected by default. Already-installed applications are skipped.
+
 ## Security
 
 This public repository intentionally contains **no installer binaries** and no
@@ -24,6 +34,7 @@ digital signatures or published SHA256 checksums before use.
 ```text
 ExRad_Workstation_Deployment/
 |-- START-EXRAD-DEPLOYMENT.bat  Double-click this to begin
+|-- README.md                 Deployment instructions
 `-- Deployment/
     |-- Branding/             ExRad wallpaper
     |-- Config/               Microsoft 365 configuration
@@ -34,20 +45,19 @@ ExRad_Workstation_Deployment/
     |   `-- RadiologistBaseline/  Standalone Intune branding script
     |-- Download-Installers.ps1   Public installer downloader
     |-- setup.ps1             Component loader/entry point
-    |-- README.md             Deployment instructions
     `-- LICENSE
 ```
 
-Paths below are relative to `Deployment` unless stated otherwise. Git metadata
+Paths below are relative to the repository root unless stated otherwise. Git metadata
 and `.gitignore` remain at the repository root.
 
 Installer binaries inside `Deployment\Installers` remain ignored by Git. For backward
-compatibility, `setup.ps1` also detects installers left beside the script, but
-new downloads and manually supplied packages should use `Installers`.
+compatibility, `Deployment\setup.ps1` also detects installers left beside that
+script, but new packages should use `Deployment\Installers`.
 
 ## Required local files
 
-Place these files in `Installers` after cloning or downloading the repository:
+Place these files in `Deployment\Installers` after cloning or downloading the repository:
 
 | Application | Expected filename/pattern |
 | --- | --- |
@@ -59,10 +69,10 @@ Place these files in `Installers` after cloning or downloading the repository:
 | AutoHotkey v2 | `AutoHotkey_2*_setup.exe` |
 | Razer Synapse | `RazerSynapseInstaller.exe` |
 
-Installer binaries are ignored by Git and remain local to the `Installers`
+Installer binaries are ignored by Git and remain local to the `Deployment\Installers`
 folder.
 
-`Tartarus_Keybindings` contains the exported Synapse profile and its optional
+`Deployment\Tartarus_Keybindings` contains the exported Synapse profile and its optional
 AutoHotkey v2 actions:
 
 - `Expert_Radiology.synapse4`
@@ -74,13 +84,13 @@ AutoHotkey v2 actions:
 
 ## Run
 
-1. Run `Download-Installers.ps1` if you need the public vendor installers.
+1. Run `Deployment\Download-Installers.ps1` if you need the public vendor installers.
    It verifies their digital signatures or published
    SHA256 checksums.
 2. Add the NinjaOne `installer.msi` and `RamSoftLauncherSetup.exe` to
-   `Installers` manually. No private URL file is needed.
-3. Review `Config\Microsoft365-Configuration.xml` and the bookmarks in
-   `Scripts\ChromePolicies.ps1`.
+   `Deployment\Installers` manually. No private URL file is needed.
+3. Review `Deployment\Config\Microsoft365-Configuration.xml` and the bookmarks in
+   `Deployment\Scripts\ChromePolicies.ps1`.
 4. Double-click `START-EXRAD-DEPLOYMENT.bat` at the repository root and approve
    the Administrator prompt.
 5. All applications needing installation, Tartarus profile preparation,
@@ -126,7 +136,7 @@ when necessary. Razer Synapse uses its interactive installer.
 - Windows dark mode is enabled by default for both apps and system surfaces. It
   is applied to the current user and seeded into the Default User profile so
   newly created Windows users inherit it.
-- The included image in `Branding` is copied to
+- The included image in `Deployment\Branding` is copied to
   `C:\ProgramData\ExpertRadiology\Branding`, applied immediately to the current
   desktop, seeded for new Windows profiles, and configured as the managed
   lock/sign-in image. Windows 11 Enterprise and Education honor the managed
@@ -136,3 +146,16 @@ when necessary. Razer Synapse uses its interactive installer.
   Radiology**, phone **(415) 900-2000**, and online support URL
   **https://www.expertradiology.com/**. Windows controls the labels and their
   display order in the About page.
+
+## Standalone Intune baseline
+
+`Deployment\Intune\RadiologistBaseline\Install-Baseline.ps1` is a separate
+System-context Win32 app script for Autopilot. Package it alongside
+`wallpaper.png` and `lockscreen.png`. It copies the images to `C:\ProgramData\ER`,
+sets OEM support details, and seeds desktop wallpaper and dark mode for new
+user profiles. Detection uses the 64-bit registry value
+`HKLM\SOFTWARE\ER\Baseline\Version`, string equal to `2`.
+
+On Windows Pro, the Intune baseline copies the lock-screen image but skips
+unsupported Group Policy lock-screen enforcement. Existing user profiles are
+not modified by that standalone baseline.
