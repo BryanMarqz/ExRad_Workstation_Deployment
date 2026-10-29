@@ -9,7 +9,7 @@ function Set-ExRadChromePolicies {
     $bookmarks = @(
         @{ name = 'RamSoft Login'; url = 'https://expertradiology.ramsoftpacs.com/powerreader/Login.aspx' },
         @{ name = 'RADAware'; url = 'https://portal.zettahealth.co/' },
-        @{ name = 'RADWorx'; url = 'https://www.zettahealth.co/radworx' },
+        @{ name = 'RADWorx'; url = 'https://portal.zettahealth.co/radworx/Page/Home' },
         @{ name = 'Gmail'; url = 'https://gmail.com' }
     ) | ConvertTo-Json -Compress
     New-ItemProperty -Path $chromeRegistryPath -Name 'ManagedBookmarks' `
